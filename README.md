@@ -1,7 +1,7 @@
 # Koa-API
 
 ## Get Started
-port needs to be modified
+Address, port needs to be modified
 
 ```bash
 cd koa-api-example
