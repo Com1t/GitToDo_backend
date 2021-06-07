@@ -3,6 +3,8 @@ const Koa = require('koa');
 const Router = require('koa-router');
 const koaBody = require('koa-body');
 const mongo = require('koa-mongo');
+const cors = require('koa-cors');
+const koaJwt = require('koa-jwt');
 
 const app = new Koa();
 const router = new Router();
@@ -11,7 +13,7 @@ app.use(mongo({
     host: '192.168.50.170',
     port: 27017,
     db: 'git_to_do',
-}))
+}));
 app.use(koaBody());
 
 function tokenValid( expire_time ){
@@ -23,6 +25,13 @@ function tokenValid( expire_time ){
         return true;
     }
 }
+
+const koaOptions = {
+  origin: '*',
+  credentials: true
+};
+
+app.use(cors(koaOptions));
 
 router
     // -----------------------------------------------------USER--------------------------------------------------------- //
@@ -128,10 +137,10 @@ router
     
     // getUser
     .get('/user/getUser/:id', async ctx => {
-        const { token } = ctx.request.header;
-        const token_exist = await ctx.db.collection('Auth').findOne({token: token});
+        // const { token } = ctx.request.header;
+        // const token_exist = await ctx.db.collection('Auth').findOne({token: token});
 
-        if(tokenValid(token_exist.expire_time)){
+        // if(tokenValid(token_exist.expire_time)){
             const id = ctx.params.id;
 
             if (ctx.params.id) {
@@ -150,18 +159,18 @@ router
                 // Failed
                 ctx.status = 404;
             }
-        }
-        else{
-            ctx.status = 404;
-        }
+        // }
+        // else{
+        //     ctx.status = 404;
+        // }
     })
 
     // modifyUser
     .put('/user/modifyUser/:id', async ctx => {
-        const { token } = ctx.request.header;
-        const token_exist = await ctx.db.collection('Auth').findOne({token: token});
+        // const { token } = ctx.request.header;
+        // const token_exist = await ctx.db.collection('Auth').findOne({token: token});
 
-        if(tokenValid(token_exist.expire_time)){
+        // if(tokenValid(token_exist.expire_time)){
             const id = ctx.params.id;
             const { name } = ctx.request.body;
             const { email } = ctx.request.body;
@@ -194,28 +203,14 @@ router
             } else {
                 ctx.status = 400;
             }
-        }
-        else{
-            ctx.status = 400;
-        }
+        // }
+        // else{
+        //     ctx.status = 400;
+        // }
 
     })
 
     // -----------------------------------------------------LINE--------------------------------------------------------- //
-
-        // console.log(owner)
-        // console.log(sharer)
-        // console.log(url)
-        // console.log(title)
-        // console.log(content)
-        // console.log(JSON.parse(color_RGB)[0])
-        // console.log(typeof(JSON.parse(color_RGB)))
-        // console.log(create_date)
-        // console.log(due_date)
-        // console.log(importance)
-        // console.log(is_main)
-        // console.log(contain_branch)
-        // console.log(head_node_id)
 
     // addLine
     .post('/line/addLine', async ctx => {
@@ -229,17 +224,16 @@ router
         const { due_date } = ctx.request.body;
         const { importance } = ctx.request.body;
         const { is_main } = ctx.request.body;
-        const { contain_branch } = ctx.request.body;
-        const { head_node_id } = ctx.request.body;
         // no need to been updated here
-        // const { branch_node_id } = ctx.request.body;    // array
-        // // const { branch_line_id } = ctx.request.body;    // array
+        // const { contain_branch } = ctx.request.body;
+        // const { branch_line_id } = ctx.request.body;    // array
 
         if (owner && title && color_RGB && create_date && due_date && is_main) {
             // insert new line into DB
             const new_node = await ctx.db.collection('Line').insertOne({
                 owner,
                 sharer,
+                sharer_progress: null,
                 url,
                 title,
                 content,
@@ -249,9 +243,7 @@ router
                 importance,
                 is_main,
                 contain_branch: false,
-                head_node_id: null,
-                branch_node_id: null,
-                head_node_id: null
+                branch_line_id: null
             });
             // return inserted result
             await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(new_node.insertedId)})
@@ -282,8 +274,6 @@ router
         const { importance } = ctx.request.body;
         const { is_main } = ctx.request.body;
         const { contain_branch } = ctx.request.body;
-        const { head_node_id } = ctx.request.body;
-        const { branch_node_id } = ctx.request.body;    // array
         const { branch_line_id } = ctx.request.body;    // array
 
         if (id) {
@@ -294,6 +284,7 @@ router
                 await ctx.db.collection('Line').updateOne({_id: mongo.ObjectId(id)}, {$set: {
                     owner: owner,
                     sharer: sharer ? sharer: lineObj.sharer,
+                    sharer_progress: sharer_progress ? sharer_progress : lineObj.sharer_progress,
                     url: url ? url: lineObj.url,
                     title: title ? title: lineObj.title,
                     content: content ? content: lineObj.content,
@@ -303,8 +294,6 @@ router
                     importance: importance ? importance: lineObj.importance,
                     is_main: is_main ? is_main: lineObj.is_main,
                     contain_branch: contain_branch ? contain_branch: lineObj.contain_branch,
-                    head_node_id: head_node_id ? head_node_id: lineObj.head_node_id,
-                    branch_node_id: branch_node_id ? JSON.parse(branch_node_id): lineObj.branch_node_id,
                     branch_line_id: branch_line_id ? JSON.parse(branch_line_id): lineObj.branch_line_id,
                 }});
                 await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(id)})
@@ -359,7 +348,8 @@ router
                     account: userObj.account,
                     password: userObj.password,
                     avatar_url: userObj.avatar_url,
-                    todo_main: mongo.ObjectId(lineId)
+                    todo_main: mongo.ObjectId(lineId),
+                    is_main: true
                 }});
                 ctx.status = 200;      
             } else {
@@ -370,6 +360,91 @@ router
         }       
     })
 
+    // shareLine
+    .put('/line/shareLine/:lineId/:userId', async ctx => {
+        const lineId = ctx.params.lineId;
+        const userId = ctx.params.userId;
+
+        if (userId && lineId) {
+            // Find corresponding user data
+            var lineObj = await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(lineId)});
+            const head_node_id = (await ctx.db.collection('Node').find({mother_line_id: mongo.ObjectId(lineId)}).sort( { due_date : 1 } ).limit(1).toArray())[0]['_id'];
+            
+            if(lineObj.sharer.indexOf(userId) == -1){
+                lineObj.sharer ? (lineObj.sharer.push(userId)) : lineObj.sharer = [userId]
+                lineObj.sharer_progress? (lineObj.sharer_progress.push(head_node_id)): lineObj.sharer_progress = [head_node_id]
+            }
+            if (lineObj) {
+                console.log("asdf")
+                await ctx.db.collection('Line').updateOne({_id: mongo.ObjectId(lineId)}, {$set: {
+                    owner: lineObj.owner,
+                    sharer: lineObj.sharer,
+                    sharer_progress: lineObj.sharer_progress,
+                    url: lineObj.url,
+                    title: lineObj.title,
+                    content: lineObj.content,
+                    color_RGB: lineObj.color_RGB,
+                    create_date: lineObj.create_date,
+                    due_date: lineObj.due_date,
+                    importance: lineObj.importance,
+                    is_main: lineObj.is_main,
+                    contain_branch: lineObj.contain_branch,
+                    branch_line_id: lineObj.branch_line_id,
+                }});
+                
+                ctx.status = 200;      
+            } else {
+                ctx.status = 404;
+            }
+        } else {
+            ctx.status = 400;
+        }       
+    })
+
+
+    // setShareProgress
+    .put('/line/setShareProgress/:lineId/:userId/:nodeId', async ctx => {
+        const lineId = ctx.params.lineId;
+        const userId = ctx.params.userId;
+        const nodeId = ctx.params.nodeId;
+
+        if (userId && lineId && nodeId) {
+            // Find corresponding user data
+            var lineObj = await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(lineId)});
+            
+            idxOfuser = lineObj.sharer.indexOf(userId);
+            if( idxOfuser == -1 ){
+                ctx.status = 404;
+            }{
+                lineObj.sharer_progress[idxOfuser] = nodeId;
+            }
+
+            if (lineObj) {
+                await ctx.db.collection('Line').updateOne({_id: mongo.ObjectId(lineId)}, {$set: {
+                    owner: lineObj.owner,
+                    sharer: lineObj.sharer,
+                    sharer_progress: lineObj.sharer_progress,
+                    url: lineObj.url,
+                    title: lineObj.title,
+                    content: lineObj.content,
+                    color_RGB: lineObj.color_RGB,
+                    create_date: lineObj.create_date,
+                    due_date: lineObj.due_date,
+                    importance: lineObj.importance,
+                    is_main: lineObj.is_main,
+                    contain_branch: lineObj.contain_branch,
+                    branch_line_id: lineObj.branch_line_id,
+                }});
+                
+                ctx.status = 200;      
+            } else {
+                ctx.status = 404;
+            }
+        } else {
+            ctx.status = 400;
+        }       
+    })
+    
     // getMainLine
     .get('/line/getMainLine/:id', async ctx => {
         const id = ctx.params.id;
@@ -413,10 +488,9 @@ router
                 importance: lineObj.importance,
                 is_main: false,
                 contain_branch: false,
-                head_node_id: null,
-                branch_node_id: null,
-                head_node_id: null
+                branch_line_id: null
             });
+
             var res = await ctx.db.collection('Node').find({mother_line_id: mongo.ObjectId(lineId)}).toArray();
             
             for(node of res){
@@ -440,45 +514,27 @@ router
     })
 
     //getNodesByLine
-    .get('/line/getNodesByLine/:lineId/:startNodeId/:amount/:sortby', async ctx => {
+    .get('/line/getNodesByLine/:lineId/:offset/:amount/:sortby', async ctx => {
         const lineId = ctx.params.lineId;
-        const startNodeId = ctx.params.startNodeId;
+        const offset = ctx.params.offset;
         const amount = ctx.params.amount;
-        const sortby = ctx.params.sortby;
+        var sortby = ctx.params.sortby;
 
         console.log(lineId);
-        console.log(startNodeId);
+        console.log(offset);
         console.log(amount);
         console.log(sortby);
 
-        if (lineId && startNodeId) {
-            flag = false;
-            var res = await ctx.db.collection('Node').find({mother_line_id: mongo.ObjectId(lineId)}).toArray();
-            nodeList = [];
-            count = 0;
-            console.log(res.length);
-            for(node of res){
-                if(startNodeId == node['_id'])
-                    flag = true;
-                if(flag){
-                    count++;
-                    nodeList.push(node);
-                    if(count == amount)
-                        break;
-                }
-            }
-            console.log(nodeList.length);
-            ctx.body = nodeList;
-            // await ctx.db.collection('Node').insertMany(res);
+        if (lineId && offset && amount && sortby) {
+            // translate sortby
+            if(sortby == 0)
+                sortby = 1;
+            else
+                sortby = -1;
+            
+            var res = await ctx.db.collection('Node').find({mother_line_id: mongo.ObjectId(lineId)}).sort( { due_date : sortby } ).skip(Number(offset)).limit(Number(amount)).toArray();
 
-            // return inserted result
-            // await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(new_node.insertedId)})
-            // .then((res) => {
-            //     ctx.body = res;
-            // })
-            // .catch((err) => {
-            //     ctx.status = 400;
-            // });
+            ctx.body = res;
         } else {
             ctx.status = 400;
         }       
@@ -510,20 +566,20 @@ router
     // addNode
     .post('/node/addNode', async ctx => {
         const { is_main } = ctx.request.body;
-        const { is_head } = ctx.request.body;
         const { mother_line_id } = ctx.request.body;
+        // const { branch_line_id } = ctx.request.body;
         const { create_date } = ctx.request.body;
         const { due_date } = ctx.request.body;
         const { title } = ctx.request.body;
         const { url } = ctx.request.body;
         const { content } = ctx.request.body;
         
-        if (is_main && is_head && mother_line_id && create_date && due_date && title) {
+        if (is_main && mother_line_id && create_date && due_date && content) {
             // insert new node into DB
             const new_node = await ctx.db.collection('Node').insertOne({
                 is_main,
-                is_head,
                 mother_line_id: mongo.ObjectId(mother_line_id),
+                branch_line_id: null,
                 create_date: (new Date(create_date)),
                 due_date: (new Date(due_date)),
                 title,
@@ -569,14 +625,13 @@ router
     .put('/node/modifyNode/:id', async ctx => {
         const id = ctx.params.id;
         const { is_main } = ctx.request.body;
-        const { is_head } = ctx.request.body;
+        // const { mother_line_id } = ctx.request.body;
+        // const { branch_line_id } = ctx.request.body;
         const { create_date } = ctx.request.body;
         const { due_date } = ctx.request.body;
         const { title } = ctx.request.body;
         const { url } = ctx.request.body;
         const { content } = ctx.request.body;
-        const { achieved } = ctx.request.body;
-        const { achieved_at } = ctx.request.body;
 
         if (id) {
             const nodeObj = await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(id)});
@@ -585,8 +640,8 @@ router
             if (nodeObj) {        
                 await ctx.db.collection('Node').updateOne({_id: mongo.ObjectId(id)}, {$set: {
                     is_main: is_main ? is_main: nodeObj.is_main,
-                    is_head: is_head ? is_head: nodeObj.is_head,
                     mother_line_id: mongo.ObjectId(nodeObj.mother_line_id),
+                    branch_line_id: mongo.ObjectId(nodeObj.branch_line_id),
                     create_date: create_date ? (new Date(create_date)): nodeObj.create_date,
                     due_date: due_date ? (new Date(due_date)): nodeObj.due_date,
                     title: title ? title: nodeObj.title,
@@ -640,6 +695,44 @@ router
             ctx.status = 404;
         }    
     });
+app.use( async (ctx, next) => {
+    console.log(ctx.header.authorization)
+    // if (ctx.header && ctx.header.authorization) {
+    //     const parts = ctx.header.authorization.split(' ');
+    //     if (parts.length === 2) {
+    //     //取出token
+    //     const scheme = parts[0];
+    //     const token = parts[1];
+        
+    //     if (/^Bearer$/i.test(scheme)) {
+    //         try {
+    //             //jwt.verify方法验证token是否有效
+    //             jwt.verify(token, secret.sign, {
+    //                 complete: true
+    //             });
+    //         } catch (error) {
+    //             //token过期 生成新的token
+    //             const newToken = getToken(user);
+    //             //将新token放入Authorization中返回给前端
+    //             ctx.res.setHeader('Authorization', newToken);
+    //         }
+    //     }
+    //     }
+    // }
 
+    return next();
+});
+
+// //路由权限控制 除了path里的路径不需要验证token 其他都要
+// app.use(
+//     koaJwt({
+//         secret: 'my_app_secret'
+//     }).unless({
+//         path: [/^\/logIn/, /^\/signIn/]
+//     })
+// );
 app.use(router.routes());
+
+
+
 app.listen(3000);
