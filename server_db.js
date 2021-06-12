@@ -693,6 +693,135 @@ router
         }
     })
 
+    // addSubTask
+    .post('/node/addSubTask', async ctx => {
+        const { nodeId } = ctx.request.body;
+        const { subtask } = ctx.request.body;
+        const { done } = ctx.request.body;
+        
+
+        if (subtask && done) {
+            var nodeObj = await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(nodeId)});
+            nodeObj.subtask ? nodeObj.subtask.push({subtask, done}) : nodeObj.subtask = [{subtask, done}]
+            
+            // insert new node into DB
+            await ctx.db.collection('Node').updateOne({_id: mongo.ObjectId(nodeId)}, {$set: {
+                mother_line_id: nodeObj.mother_line_id,
+                branch_line_id: nodeObj.branch_line_id,
+                create_date: nodeObj.create_date,
+                due_date: nodeObj.due_date,
+                title: nodeObj.title,
+                url: nodeObj.url,
+                content: nodeObj.content,
+                achieved: nodeObj.achieved,
+                achieved_at: nodeObj.achieved_at,
+                importance: nodeObj.importance,
+                subtask: nodeObj.subtask
+            }});
+            
+            // return updated result
+            await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(nodeId)})
+            .then((res) => {
+                ctx.body = res;
+            })
+            .catch((err) => {
+                ctx.status = 200;
+            });
+        } else {
+            // 如果有欄位沒有填，就依照文件回傳 400
+            ctx.status = 400;
+        }
+    })
+
+    // modifySubTask
+    .put('/node/modifySubTask/:nodeId', async ctx => {
+        const nodeId = ctx.params.nodeId;
+        const { subtaskIdx } = ctx.request.body;
+        const { subtask } = ctx.request.body;
+        const { done } = ctx.request.body;
+        console.log(nodeId, subtaskIdx, subtask, done)
+
+        if (nodeId && subtaskIdx && subtask && done) {
+            var nodeObj = await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(nodeId)});
+            if(subtaskIdx < 0 || subtaskIdx >= nodeObj.subtask.length){
+                ctx.status = 400;
+                return;
+            }
+            
+            nodeObj.subtask[subtaskIdx] = {subtask, done}
+            // insert new node into DB
+            await ctx.db.collection('Node').updateOne({_id: mongo.ObjectId(nodeId)}, {$set: {
+                mother_line_id: nodeObj.mother_line_id,
+                branch_line_id: nodeObj.branch_line_id,
+                create_date: nodeObj.create_date,
+                due_date: nodeObj.due_date,
+                title: nodeObj.title,
+                url: nodeObj.url,
+                content: nodeObj.content,
+                achieved: nodeObj.achieved,
+                achieved_at: nodeObj.achieved_at,
+                importance: nodeObj.importance,
+                subtask: nodeObj.subtask
+            }});
+            
+            // return updated result
+            await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(nodeId)})
+            .then((res) => {
+                ctx.body = res;
+            })
+            .catch((err) => {
+                ctx.status = 200;
+            });
+        } else {
+            // 如果有欄位沒有填，就依照文件回傳 400
+            ctx.status = 400;
+        }
+    })
+
+    // deleteSubTask
+    .delete('/node/deleteSubTask/:nodeId/:subtaskIdx', async ctx => {
+        const nodeId = ctx.params.nodeId;
+        const subtaskIdx = ctx.params.subtaskIdx;
+        
+        console.log(nodeId, subtaskIdx)
+
+        if (nodeId && subtaskIdx) {
+            var nodeObj = await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(nodeId)});
+            if(subtaskIdx < 0 || subtaskIdx >= nodeObj.subtask.length){
+                ctx.status = 400;
+                return;
+            }
+            nodeObj.subtask.splice( subtaskIdx, 1);
+            
+            // insert new node into DB
+            await ctx.db.collection('Node').updateOne({_id: mongo.ObjectId(nodeId)}, {$set: {
+                mother_line_id: nodeObj.mother_line_id,
+                branch_line_id: nodeObj.branch_line_id,
+                create_date: nodeObj.create_date,
+                due_date: nodeObj.due_date,
+                title: nodeObj.title,
+                url: nodeObj.url,
+                content: nodeObj.content,
+                achieved: nodeObj.achieved,
+                achieved_at: nodeObj.achieved_at,
+                importance: nodeObj.importance,
+                subtask: nodeObj.subtask
+            }});
+            
+            // return updated result
+            await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(nodeId)})
+            .then((res) => {
+                ctx.body = res;
+            })
+            .catch((err) => {
+                ctx.status = 200;
+            });
+        } else {
+            // 如果有欄位沒有填，就依照文件回傳 400
+            ctx.status = 400;
+        }
+    })
+
     // getNode
     .get('/node/getNode/:id', async ctx => {
         const id = ctx.params.id;
