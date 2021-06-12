@@ -10,8 +10,8 @@ const app = new Koa();
 const router = new Router();
 
 app.use(mongo({
-    host: '192.168.50.170',
-    port: 27017,
+    host: '140.114.91.242',
+    port: 28017,
     db: 'git_to_do',
 }));
 app.use(koaBody());
@@ -39,6 +39,7 @@ router
     .post('/user/signIn', async ctx => {
         const { name } = ctx.request.body;
         const { email } = ctx.request.body;
+        const { phone_number } = ctx.request.body;
         const { account } = ctx.request.body;
         const { password } = ctx.request.body;
         const { avatar_url } = ctx.request.body;
@@ -49,20 +50,8 @@ router
                 
             if (account_exist) {
                 if(account_exist.password === password){
-                    var token = "empty";
-                    var currentdate = new Date();
-                    // remove old one
-                    await ctx.db.collection('Auth').remove({account: account});
-
-                    token = jwt.sign(password, currentdate.toString());
-                    await ctx.db.collection('Auth').insertOne({
-                        account,
-                        token,
-                        expire_time: currentdate.getTime() + (60*60*1000)
-                    });
-
                     ctx.status = 200;
-                    ctx.body = token;
+                    ctx.body = account_exist._id;
                 }
                 else{
                     ctx.status = 303;
@@ -72,23 +61,41 @@ router
                 const data = await ctx.db.collection('User').insertOne({
                     name,
                     email,
+                    phone_number,
                     account,
                     password,
                     avatar_url
                 });
 
-                // create token
-                var token = "empty";
-                var currentdate = new Date();
-                token = jwt.sign(password, currentdate.toString());
-                await ctx.db.collection('Auth').insertOne({
-                    account,
-                    token,
-                    expire_time: currentdate.getTime() + (60*60*1000)
+                // create new line
+                const new_line = await ctx.db.collection('Line').insertOne({
+                    owner: mongo.ObjectId(data.insertedId),
+                    permission: false,
+                    sharer: null,
+                    sharer_progress: null,
+                    url: null,
+                    title: null,
+                    content: null,
+                    color_RGB: null,
+                    create_date: null,
+                    due_date: null,
+                    is_main: null,
+                    contain_branch: 0
                 });
 
+                // update into userObj
+                await ctx.db.collection('User').updateOne({_id: mongo.ObjectId(data.insertedId)}, {$set: {
+                    name: name,
+                    email: email,
+                    phone_number: phone_number,
+                    account: account,
+                    password: password,
+                    avatar_url: avatar_url,
+                    todo_host: mongo.ObjectId(new_line.insertedId),
+                }});
+
                 ctx.status = 200;
-                ctx.body = token;
+                ctx.body = data.insertedId;
             }
         } else {
             // 如果有欄位沒有填，就依照文件回傳 400
@@ -106,21 +113,8 @@ router
                 
             if (account_exist) {
                 if(account_exist.password === password){
-                    var token = "empty";
-                    var currentdate = new Date();
-                    // remove old one
-                    await ctx.db.collection('Auth').remove({account: account});
-
-                    token = jwt.sign(password, currentdate.toString());
-                    console.log(currentdate.getTime() + (60*60*1000))
-                    await ctx.db.collection('Auth').insertOne({
-                        account,
-                        token,
-                        expire_time: currentdate.getTime() + (60*60*1000)
-                    });
-
                     ctx.status = 200;
-                    ctx.body = token;
+                    ctx.body = account_exist._id;
                 }
                 else{
                     ctx.status = 303;
@@ -137,77 +131,63 @@ router
     
     // getUser
     .get('/user/getUser/:id', async ctx => {
-        // const { token } = ctx.request.header;
-        // const token_exist = await ctx.db.collection('Auth').findOne({token: token});
+        const id = ctx.params.id;
 
-        // if(tokenValid(token_exist.expire_time)){
-            const id = ctx.params.id;
-
-            if (ctx.params.id) {
-                const userObj = await ctx.db.collection('User').findOne({_id: mongo.ObjectId(id)});
-                console.log(userObj)
-                
-                if (userObj) {
-                    // Success
-                    ctx.body = userObj;
-                    ctx.status = 200;
-                } else {
-                    // Failed
-                    ctx.status = 404;
-                }
+        if (ctx.params.id) {
+            const userObj = await ctx.db.collection('User').findOne({_id: mongo.ObjectId(id)});
+            console.log(userObj)
+            
+            if (userObj) {
+                // Success
+                ctx.body = userObj;
+                ctx.status = 200;
             } else {
                 // Failed
                 ctx.status = 404;
             }
-        // }
-        // else{
-        //     ctx.status = 404;
-        // }
+        } else {
+            // Failed
+            ctx.status = 404;
+        }
     })
 
     // modifyUser
     .put('/user/modifyUser/:id', async ctx => {
-        // const { token } = ctx.request.header;
-        // const token_exist = await ctx.db.collection('Auth').findOne({token: token});
+        const id = ctx.params.id;
+        const { name } = ctx.request.body;
+        const { email } = ctx.request.body;
+        const { phone_number } = ctx.request.body;
+        const { account } = ctx.request.body;
+        const { password } = ctx.request.body;
+        const { avatar_url } = ctx.request.body;
 
-        // if(tokenValid(token_exist.expire_time)){
-            const id = ctx.params.id;
-            const { name } = ctx.request.body;
-            const { email } = ctx.request.body;
-            const { account } = ctx.request.body;
-            const { password } = ctx.request.body;
-            const { avatar_url } = ctx.request.body;
-
-            if (id) {
-                // Find corresponding user data
-                const userObj = await ctx.db.collection('User').findOne({_id: mongo.ObjectId(id)});
-                
-                if (userObj) {
-                    await ctx.db.collection('User').updateOne({_id: mongo.ObjectId(id)}, {$set: {
-                        name: name ? name: userObj.name,
-                        email: email ? email: userObj.email,
-                        account: account ? account: userObj.account,
-                        password: password ? password: userObj.password,
-                        avatar_url: avatar_url ? avatar_url: userObj.avatar_url
-                    }});
-                    await ctx.db.collection('User').findOne({_id: mongo.ObjectId(id)})
-                    .then((res) => {
-                        ctx.body = res;
-                    })
-                    .catch((err) => {
-                        ctx.status = 400;
-                    });
-                } else {
-                    ctx.status = 404;
-                }
+        if (id) {
+            // Find corresponding user data
+            const userObj = await ctx.db.collection('User').findOne({_id: mongo.ObjectId(id)});
+            
+            if (userObj) {
+                await ctx.db.collection('User').updateOne({_id: mongo.ObjectId(id)}, {$set: {
+                    name: name ? name: userObj.name,
+                    email: email ? email: userObj.email,
+                    phone_number: phone_number? phone_number: userObj.phone_number,
+                    account: account ? account: userObj.account,
+                    password: password ? password: userObj.password,
+                    avatar_url: avatar_url ? avatar_url: userObj.avatar_url,
+                    todo_host: mongo.ObjectId(userObj.insertedId),
+                }});
+                await ctx.db.collection('User').findOne({_id: mongo.ObjectId(id)})
+                .then((res) => {
+                    ctx.body = res;
+                })
+                .catch((err) => {
+                    ctx.status = 400;
+                });
             } else {
-                ctx.status = 400;
+                ctx.status = 404;
             }
-        // }
-        // else{
-        //     ctx.status = 400;
-        // }
-
+        } else {
+            ctx.status = 400;
+        }
     })
 
     // -----------------------------------------------------LINE--------------------------------------------------------- //
@@ -215,24 +195,25 @@ router
     // addLine
     .post('/line/addLine', async ctx => {
         const { owner } = ctx.request.body;
-        const { sharer } = ctx.request.body;
+        const { permission } = ctx.request.body;
+        // const { sharer } = ctx.request.body;
+        // const { sharer_progress } = ctx.request.body;
         const { url } = ctx.request.body;
         const { title } = ctx.request.body;
         const { content } = ctx.request.body;
         const { color_RGB } = ctx.request.body;
         const { create_date } = ctx.request.body;
         const { due_date } = ctx.request.body;
-        const { importance } = ctx.request.body;
         const { is_main } = ctx.request.body;
         // no need to been updated here
         // const { contain_branch } = ctx.request.body;
-        // const { branch_line_id } = ctx.request.body;    // array
 
-        if (owner && title && color_RGB && create_date && due_date && is_main) {
+        if (owner && title && color_RGB && is_main) {
             // insert new line into DB
-            const new_node = await ctx.db.collection('Line').insertOne({
-                owner,
-                sharer,
+            const new_line = await ctx.db.collection('Line').insertOne({
+                owner: mongo.ObjectId(owner),
+                permission,
+                sharer: null,
                 sharer_progress: null,
                 url,
                 title,
@@ -240,13 +221,11 @@ router
                 color_RGB: JSON.parse(color_RGB),
                 create_date: (new Date(create_date)),
                 due_date: (new Date(due_date)),
-                importance,
                 is_main,
-                contain_branch: false,
-                branch_line_id: null
+                contain_branch: 0
             });
             // return inserted result
-            await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(new_node.insertedId)})
+            await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(new_line.insertedId)})
             .then((res) => {
                 ctx.body = res;
             })
@@ -264,17 +243,17 @@ router
         const id = ctx.params.id;
 
         const { owner } = ctx.request.body;
+        const { permission } = ctx.request.body;
         const { sharer } = ctx.request.body;
+        const { sharer_progress } = ctx.request.body;
         const { url } = ctx.request.body;
         const { title } = ctx.request.body;
         const { content } = ctx.request.body;
         const { color_RGB } = ctx.request.body;
         const { create_date } = ctx.request.body;
         const { due_date } = ctx.request.body;
-        const { importance } = ctx.request.body;
         const { is_main } = ctx.request.body;
         const { contain_branch } = ctx.request.body;
-        const { branch_line_id } = ctx.request.body;    // array
 
         if (id) {
             // Find corresponding line data
@@ -283,6 +262,7 @@ router
             if (lineObj) {
                 await ctx.db.collection('Line').updateOne({_id: mongo.ObjectId(id)}, {$set: {
                     owner: owner,
+                    permission: permission ? permission: lineObj.permission,
                     sharer: sharer ? sharer: lineObj.sharer,
                     sharer_progress: sharer_progress ? sharer_progress : lineObj.sharer_progress,
                     url: url ? url: lineObj.url,
@@ -291,10 +271,8 @@ router
                     color_RGB: color_RGB ? JSON.parse(color_RGB): lineObj.color_RGB,
                     create_date: create_date ? (new Date(create_date)): lineObj.create_date,
                     due_date: due_date ? (new Date(due_date)): lineObj.due_date,
-                    importance: importance ? importance: lineObj.importance,
                     is_main: is_main ? is_main: lineObj.is_main,
                     contain_branch: contain_branch ? contain_branch: lineObj.contain_branch,
-                    branch_line_id: branch_line_id ? JSON.parse(branch_line_id): lineObj.branch_line_id,
                 }});
                 await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(id)})
                 .then((res) => {
@@ -332,34 +310,6 @@ router
         }       
     })
 
-    // setMainLine
-    .put('/line/setMainLine/:userId/:lineId', async ctx => {
-        const userId = ctx.params.userId;
-        const lineId = ctx.params.lineId;
-        if (userId && lineId) {
-            // Find corresponding user data
-            const userObj = await ctx.db.collection('User').findOne({_id: mongo.ObjectId(userId)});
-            const lineObj = await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(lineId)});
-            
-            if (userObj && lineObj) {
-                await ctx.db.collection('User').updateOne({_id: mongo.ObjectId(userId)}, {$set: {
-                    name: userObj.name,
-                    email: userObj.email,
-                    account: userObj.account,
-                    password: userObj.password,
-                    avatar_url: userObj.avatar_url,
-                    todo_main: mongo.ObjectId(lineId),
-                    is_main: true
-                }});
-                ctx.status = 200;      
-            } else {
-                ctx.status = 404;
-            }
-        } else {
-            ctx.status = 400;
-        }       
-    })
-
     // shareLine
     .put('/line/shareLine/:lineId/:userId', async ctx => {
         const lineId = ctx.params.lineId;
@@ -375,9 +325,9 @@ router
                 lineObj.sharer_progress? (lineObj.sharer_progress.push(head_node_id)): lineObj.sharer_progress = [head_node_id]
             }
             if (lineObj) {
-                console.log("asdf")
                 await ctx.db.collection('Line').updateOne({_id: mongo.ObjectId(lineId)}, {$set: {
                     owner: lineObj.owner,
+                    owner: lineObj.permission,
                     sharer: lineObj.sharer,
                     sharer_progress: lineObj.sharer_progress,
                     url: lineObj.url,
@@ -386,10 +336,8 @@ router
                     color_RGB: lineObj.color_RGB,
                     create_date: lineObj.create_date,
                     due_date: lineObj.due_date,
-                    importance: lineObj.importance,
                     is_main: lineObj.is_main,
                     contain_branch: lineObj.contain_branch,
-                    branch_line_id: lineObj.branch_line_id,
                 }});
                 
                 ctx.status = 200;      
@@ -422,6 +370,7 @@ router
             if (lineObj) {
                 await ctx.db.collection('Line').updateOne({_id: mongo.ObjectId(lineId)}, {$set: {
                     owner: lineObj.owner,
+                    permission: lineObj.permission,
                     sharer: lineObj.sharer,
                     sharer_progress: lineObj.sharer_progress,
                     url: lineObj.url,
@@ -430,31 +379,10 @@ router
                     color_RGB: lineObj.color_RGB,
                     create_date: lineObj.create_date,
                     due_date: lineObj.due_date,
-                    importance: lineObj.importance,
                     is_main: lineObj.is_main,
                     contain_branch: lineObj.contain_branch,
-                    branch_line_id: lineObj.branch_line_id,
                 }});
                 
-                ctx.status = 200;      
-            } else {
-                ctx.status = 404;
-            }
-        } else {
-            ctx.status = 400;
-        }       
-    })
-    
-    // getMainLine
-    .get('/line/getMainLine/:id', async ctx => {
-        const id = ctx.params.id;
-        if (id) {
-            // Find corresponding user data
-            const userObj = await ctx.db.collection('User').findOne({_id: mongo.ObjectId(id)});
-            const lineObj = await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(userObj.todo_main)});
-            
-            if (lineObj) {
-                ctx.body = lineObj;
                 ctx.status = 200;      
             } else {
                 ctx.status = 404;
@@ -478,17 +406,17 @@ router
             // insert new line into DB
             const new_node = await ctx.db.collection('Line').insertOne({
                 owner: userObj._id,
+                permission: false,
                 sharer: null,
+                sharer_progress: null,
                 url: lineObj.url,
                 title: lineObj.title,
                 content: lineObj.content,
                 color_RGB: lineObj.color_RGB,
                 create_date: currentdate,
                 due_date: lineObj.due_date,
-                importance: lineObj.importance,
                 is_main: false,
-                contain_branch: false,
-                branch_line_id: null
+                contain_branch: 0,
             });
 
             var res = await ctx.db.collection('Node').find({mother_line_id: mongo.ObjectId(lineId)}).toArray();
@@ -508,6 +436,25 @@ router
             .catch((err) => {
                 ctx.status = 400;
             });
+        } else {
+            ctx.status = 400;
+        }       
+    })
+    
+    // getMainLine
+    .get('/line/getMainLine/:id', async ctx => {
+        const id = ctx.params.id;
+        if (id) {
+            // Find corresponding user data
+            const userObj = await ctx.db.collection('User').findOne({_id: mongo.ObjectId(id)});
+            const lineObj = await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(userObj.todo_main)});
+            
+            if (lineObj) {
+                ctx.body = lineObj;
+                ctx.status = 200;      
+            } else {
+                ctx.status = 404;
+            }
         } else {
             ctx.status = 400;
         }       
@@ -540,6 +487,148 @@ router
         }       
     })
 
+    // addBranch
+    .post('/line/addBranch', async ctx => {
+        const { nodeId } = ctx.request.body;
+
+        const { owner } = ctx.request.body;
+        const { permission } = ctx.request.body;
+        // const { sharer } = ctx.request.body;
+        // const { sharer_progress } = ctx.request.body;
+        const { url } = ctx.request.body;
+        const { title } = ctx.request.body;
+        const { content } = ctx.request.body;
+        const { color_RGB } = ctx.request.body;
+        const { create_date } = ctx.request.body;
+        const { due_date } = ctx.request.body;
+        const { is_main } = ctx.request.body;
+        // no need to been updated here
+        // const { contain_branch } = ctx.request.body;
+
+        if (owner && title && color_RGB && is_main) {
+            // Find corresponding user data
+            var nodeObj = await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(nodeId)});
+
+            // update original line
+            var lineObj = await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(nodeObj.mother_line_id)});
+            lineObj.contain_branch = lineObj.contain_branch + 1;
+            await ctx.db.collection('Line').updateOne({_id: mongo.ObjectId(lineObj._id)}, {$set: {
+                owner: lineObj.owner,
+                permission: lineObj.permission,
+                sharer: lineObj.sharer,
+                sharer_progress: lineObj.sharer_progress,
+                url: lineObj.url,
+                title: lineObj.title,
+                content: lineObj.content,
+                color_RGB: lineObj.color_RGB,
+                create_date: lineObj.create_date,
+                due_date: lineObj.due_date,
+                is_main: lineObj.is_main,
+                contain_branch: lineObj.contain_branch,
+            }});
+
+            // insert new line into DB
+            const new_line = await ctx.db.collection('Line').insertOne({
+                owner: mongo.ObjectId(owner),
+                permission,
+                sharer: null,
+                sharer_progress: null,
+                url,
+                title,
+                content,
+                color_RGB: JSON.parse(color_RGB),
+                create_date: (new Date(create_date)),
+                due_date: (new Date(due_date)),
+                is_main,
+                contain_branch: 0
+            });
+
+            // set branch line id onto node
+            nodeObj.branch_line_id ? (nodeObj.branch_line_id.push(new_line.insertedId)) : nodeObj.branch_line_id = [new_line.insertedId];
+            await ctx.db.collection('Node').updateOne({_id: mongo.ObjectId(nodeId)}, {$set: {
+                mother_line_id: nodeObj.mother_line_id,
+                branch_line_id: nodeObj.branch_line_id,
+                create_date: nodeObj.create_date,
+                due_date: nodeObj.due_date,
+                title: nodeObj.title,
+                url: nodeObj.url,
+                content: nodeObj.content,
+                achieved: nodeObj.achieved,
+                achieved_at: nodeObj.achieved_at,
+                importance: nodeObj.importance,
+            }});
+
+            // return inserted result
+            await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(new_line.insertedId)})
+            .then((res) => {
+                ctx.body = res;
+            })
+            .catch((err) => {
+                ctx.status = 400;
+            });
+        } else {
+            // 如果有欄位沒有填，就依照文件回傳 400
+            ctx.status = 400;
+        }
+    })
+
+    // deleteBranch
+    .delete('/line/deleteBranch/:nodeId/:lineId', async ctx => {
+        // 把資料分別存在 id 變數
+        const nodeId = ctx.params.nodeId;
+        const lineId = ctx.params.lineId;
+
+        if (nodeId && lineId) {
+            // Find corresponding user data
+            var nodeObj = await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(nodeId)});
+            for(idx in nodeObj.branch_line_id){
+                if(nodeObj.branch_line_id[idx] == lineId){
+                    nodeObj.branch_line_id.splice( idx, 1);
+                    break;
+                }
+            }
+            await ctx.db.collection('Node').updateOne({_id: mongo.ObjectId(nodeId)}, {$set: {
+                mother_line_id: nodeObj.mother_line_id,
+                branch_line_id: nodeObj.branch_line_id,
+                create_date: nodeObj.create_date,
+                due_date: nodeObj.due_date,
+                title: nodeObj.title,
+                url: nodeObj.url,
+                content: nodeObj.content,
+                achieved: nodeObj.achieved,
+                achieved_at: nodeObj.achieved_at,
+                importance: nodeObj.importance,
+            }});
+
+            var motherlineObj = await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(nodeObj.mother_line_id)});
+            motherlineObj.contain_branch = motherlineObj.contain_branch - 1;
+            await ctx.db.collection('Line').updateOne({_id: mongo.ObjectId(motherlineObj._id)}, {$set: {
+                owner: motherlineObj.owner,
+                permission: motherlineObj.permission,
+                sharer: motherlineObj.sharer,
+                sharer_progress: motherlineObj.sharer_progress,
+                url: motherlineObj.url,
+                title: motherlineObj.title,
+                content: motherlineObj.content,
+                color_RGB: motherlineObj.color_RGB,
+                create_date: motherlineObj.create_date,
+                due_date: motherlineObj.due_date,
+                is_main: motherlineObj.is_main,
+                contain_branch: motherlineObj.contain_branch,
+            }});
+
+            // // remove branch
+            await ctx.db.collection('Line').remove({_id: mongo.ObjectId(lineId)});
+            await ctx.db.collection('Node').remove({mother_line_id: mongo.ObjectId(lineId)});
+            
+            ctx.status = 200;
+
+        } else {
+            // 如果沒送 id，文章就不存在，就依照文件回傳 404
+            ctx.status = 404;
+        }
+    })
+
     // deleteLine
     .delete('/line/deleteLine/:lineId', async ctx => {
         // 把資料分別存在 id 變數
@@ -551,7 +640,7 @@ router
             if (lineObj) {
                 await ctx.db.collection('Line').remove({_id: mongo.ObjectId(lineId)});
                 await ctx.db.collection('Node').remove({mother_line_id: mongo.ObjectId(lineId)});
-                ctx.status = 200;      
+                ctx.status = 200;
             } else {
                 // 沒有找到的話就依照文件回傳 404
                 ctx.status = 404;
@@ -565,7 +654,6 @@ router
     // -----------------------------------------------------NODE--------------------------------------------------------- //
     // addNode
     .post('/node/addNode', async ctx => {
-        const { is_main } = ctx.request.body;
         const { mother_line_id } = ctx.request.body;
         // const { branch_line_id } = ctx.request.body;
         const { create_date } = ctx.request.body;
@@ -573,11 +661,13 @@ router
         const { title } = ctx.request.body;
         const { url } = ctx.request.body;
         const { content } = ctx.request.body;
+        // const { achieved } = ctx.request.body;
+        // const { achieved_at } = ctx.request.body;
+        const { importance } = ctx.request.body;
         
-        if (is_main && mother_line_id && create_date && due_date && content) {
+        if (mother_line_id && create_date && due_date) {
             // insert new node into DB
             const new_node = await ctx.db.collection('Node').insertOne({
-                is_main,
                 mother_line_id: mongo.ObjectId(mother_line_id),
                 branch_line_id: null,
                 create_date: (new Date(create_date)),
@@ -586,7 +676,8 @@ router
                 url,
                 content,
                 achieved: false,
-                achieved_at: null
+                achieved_at: null,
+                importance,
             });
             // return inserted result
             await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(new_node.insertedId)})
@@ -624,7 +715,6 @@ router
     // modifyNode
     .put('/node/modifyNode/:id', async ctx => {
         const id = ctx.params.id;
-        const { is_main } = ctx.request.body;
         // const { mother_line_id } = ctx.request.body;
         // const { branch_line_id } = ctx.request.body;
         const { create_date } = ctx.request.body;
@@ -632,16 +722,18 @@ router
         const { title } = ctx.request.body;
         const { url } = ctx.request.body;
         const { content } = ctx.request.body;
+        const { achieved } = ctx.request.body;
+        const { achieved_at } = ctx.request.body;
+        const { importance } = ctx.request.body;
 
         if (id) {
             const nodeObj = await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(id)});
             console.log(nodeObj)
             
-            if (nodeObj) {        
+            if (nodeObj) {
                 await ctx.db.collection('Node').updateOne({_id: mongo.ObjectId(id)}, {$set: {
-                    is_main: is_main ? is_main: nodeObj.is_main,
-                    mother_line_id: mongo.ObjectId(nodeObj.mother_line_id),
-                    branch_line_id: mongo.ObjectId(nodeObj.branch_line_id),
+                    mother_line_id: nodeObj.mother_line_id,
+                    branch_line_id: nodeObj.branch_line_id,
                     create_date: create_date ? (new Date(create_date)): nodeObj.create_date,
                     due_date: due_date ? (new Date(due_date)): nodeObj.due_date,
                     title: title ? title: nodeObj.title,
@@ -649,6 +741,7 @@ router
                     content: content ? content: nodeObj.content,
                     achieved: achieved ? achieved: nodeObj.achieved,
                     achieved_at: achieved_at ? achieved_at: nodeObj.achieved_at,
+                    importance: importance ? importance: nodeObj.importance,
                 }});
 
                 await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(id)})
@@ -695,44 +788,7 @@ router
             ctx.status = 404;
         }    
     });
-app.use( async (ctx, next) => {
-    console.log(ctx.header.authorization)
-    // if (ctx.header && ctx.header.authorization) {
-    //     const parts = ctx.header.authorization.split(' ');
-    //     if (parts.length === 2) {
-    //     //取出token
-    //     const scheme = parts[0];
-    //     const token = parts[1];
-        
-    //     if (/^Bearer$/i.test(scheme)) {
-    //         try {
-    //             //jwt.verify方法验证token是否有效
-    //             jwt.verify(token, secret.sign, {
-    //                 complete: true
-    //             });
-    //         } catch (error) {
-    //             //token过期 生成新的token
-    //             const newToken = getToken(user);
-    //             //将新token放入Authorization中返回给前端
-    //             ctx.res.setHeader('Authorization', newToken);
-    //         }
-    //     }
-    //     }
-    // }
-
-    return next();
-});
-
-// //路由权限控制 除了path里的路径不需要验证token 其他都要
-// app.use(
-//     koaJwt({
-//         secret: 'my_app_secret'
-//     }).unless({
-//         path: [/^\/logIn/, /^\/signIn/]
-//     })
-// );
+    
 app.use(router.routes());
-
-
 
 app.listen(3000);
