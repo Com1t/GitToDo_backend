@@ -212,16 +212,16 @@ router
             // insert new line into DB
             const new_line = await ctx.db.collection('Line').insertOne({
                 owner: mongo.ObjectId(owner),
-                permission,
+                permission: JSON.parse(permission),
                 sharer: null,
                 sharer_progress: null,
-                url,
+                url: JSON.parse(url),
                 title,
-                content,
+                content: JSON.parse(content),
                 color_RGB: JSON.parse(color_RGB),
                 create_date: (new Date(create_date)),
                 due_date: (new Date(due_date)),
-                is_main,
+                is_main: JSON.parse(is_main),
                 contain_branch: 0
             });
             // return inserted result
@@ -262,17 +262,17 @@ router
             if (lineObj) {
                 await ctx.db.collection('Line').updateOne({_id: mongo.ObjectId(id)}, {$set: {
                     owner: owner,
-                    permission: permission ? permission: lineObj.permission,
+                    permission: permission ? JSON.parse(permission): lineObj.permission,
                     sharer: sharer ? sharer: lineObj.sharer,
                     sharer_progress: sharer_progress ? sharer_progress : lineObj.sharer_progress,
-                    url: url ? url: lineObj.url,
+                    url: url ? JSON.parse(url): lineObj.url,
                     title: title ? title: lineObj.title,
-                    content: content ? content: lineObj.content,
+                    content: content ? JSON.parse(content): lineObj.content,
                     color_RGB: color_RGB ? JSON.parse(color_RGB): lineObj.color_RGB,
                     create_date: create_date ? (new Date(create_date)): lineObj.create_date,
                     due_date: due_date ? (new Date(due_date)): lineObj.due_date,
-                    is_main: is_main ? is_main: lineObj.is_main,
-                    contain_branch: contain_branch ? contain_branch: lineObj.contain_branch,
+                    is_main: is_main ? JSON.parse(is_main): lineObj.is_main,
+                    contain_branch: contain_branch ? Number(contain_branch): lineObj.contain_branch,
                 }});
                 await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(id)})
                 .then((res) => {
@@ -673,11 +673,11 @@ router
                 create_date: (new Date(create_date)),
                 due_date: (new Date(due_date)),
                 title,
-                url,
-                content,
+                url: JSON.parse(url),
+                content: JSON.parse(content),
                 achieved: false,
                 achieved_at: null,
-                importance,
+                importance: Number(importance),
             });
             // return inserted result
             await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(new_node.insertedId)})
@@ -866,11 +866,11 @@ router
                     create_date: create_date ? (new Date(create_date)): nodeObj.create_date,
                     due_date: due_date ? (new Date(due_date)): nodeObj.due_date,
                     title: title ? title: nodeObj.title,
-                    url: url ? url: nodeObj.url,
-                    content: content ? content: nodeObj.content,
-                    achieved: achieved ? achieved: nodeObj.achieved,
-                    achieved_at: achieved_at ? achieved_at: nodeObj.achieved_at,
-                    importance: importance ? importance: nodeObj.importance,
+                    url: url ? JSON.parse(url): nodeObj.url,
+                    content: content ? JSON.parse(content): nodeObj.content,
+                    achieved: achieved ? JSON.parse(achieved): nodeObj.achieved,
+                    achieved_at: achieved_at ? (new Date(achieved_at)): nodeObj.achieved_at,
+                    importance: importance ? JSON.parse(importance): nodeObj.importance,
                 }});
 
                 await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(id)})
