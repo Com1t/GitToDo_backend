@@ -262,7 +262,7 @@ router
         const { content } = ctx.request.body;
         const { color_RGB } = ctx.request.body;
         const { create_date } = ctx.request.body;
-        const { due_date } = ctx.request.body;
+        // const { due_date } = ctx.request.body;
         const { is_main } = ctx.request.body;
         // no need to been updated here
         // const { contain_branch } = ctx.request.body;
@@ -279,7 +279,7 @@ router
                 content: JSON.parse(content),
                 color_RGB: JSON.parse(color_RGB),
                 create_date: (new Date(create_date)),
-                due_date: (new Date(due_date)),
+                // due_date: (new Date(due_date)),
                 is_main: JSON.parse(is_main),
                 contain_branch: 0
             });
@@ -310,7 +310,7 @@ router
         const { content } = ctx.request.body;
         const { color_RGB } = ctx.request.body;
         const { create_date } = ctx.request.body;
-        const { due_date } = ctx.request.body;
+        // const { due_date } = ctx.request.body;
         const { is_main } = ctx.request.body;
         const { contain_branch } = ctx.request.body;
 
@@ -329,7 +329,7 @@ router
                     content: content ? JSON.parse(content): lineObj.content,
                     color_RGB: color_RGB ? JSON.parse(color_RGB): lineObj.color_RGB,
                     create_date: create_date ? (new Date(create_date)): lineObj.create_date,
-                    due_date: due_date ? (new Date(due_date)): lineObj.due_date,
+                    // due_date: due_date ? (new Date(due_date)): lineObj.due_date,
                     is_main: is_main ? JSON.parse(is_main): lineObj.is_main,
                     contain_branch: contain_branch ? Number(contain_branch): lineObj.contain_branch,
                 }});
@@ -397,7 +397,7 @@ router
                     content: lineObj.content,
                     color_RGB: lineObj.color_RGB,
                     create_date: lineObj.create_date,
-                    due_date: lineObj.due_date,
+                    // due_date: lineObj.due_date,
                     is_main: lineObj.is_main,
                     contain_branch: lineObj.contain_branch,
                 }});
@@ -440,7 +440,7 @@ router
                     content: lineObj.content,
                     color_RGB: lineObj.color_RGB,
                     create_date: lineObj.create_date,
-                    due_date: lineObj.due_date,
+                    // due_date: lineObj.due_date,
                     is_main: lineObj.is_main,
                     contain_branch: lineObj.contain_branch,
                 }});
@@ -476,7 +476,7 @@ router
                 content: lineObj.content,
                 color_RGB: lineObj.color_RGB,
                 create_date: currentdate,
-                due_date: lineObj.due_date,
+                // due_date: lineObj.due_date,
                 is_main: false,
                 contain_branch: 0,
             });
@@ -562,7 +562,7 @@ router
         const { content } = ctx.request.body;
         const { color_RGB } = ctx.request.body;
         const { create_date } = ctx.request.body;
-        const { due_date } = ctx.request.body;
+        // const { due_date } = ctx.request.body;
         const { is_main } = ctx.request.body;
         // no need to been updated here
         // const { contain_branch } = ctx.request.body;
@@ -584,7 +584,7 @@ router
                 content: lineObj.content,
                 color_RGB: lineObj.color_RGB,
                 create_date: lineObj.create_date,
-                due_date: lineObj.due_date,
+                // due_date: lineObj.due_date,
                 is_main: lineObj.is_main,
                 contain_branch: lineObj.contain_branch,
             }});
@@ -600,7 +600,7 @@ router
                 content,
                 color_RGB: JSON.parse(color_RGB),
                 create_date: (new Date(create_date)),
-                due_date: (new Date(due_date)),
+                // due_date: (new Date(due_date)),
                 is_main,
                 contain_branch: 0
             });
@@ -611,7 +611,7 @@ router
                 mother_line_id: nodeObj.mother_line_id,
                 branch_line_id: nodeObj.branch_line_id,
                 create_date: nodeObj.create_date,
-                due_date: nodeObj.due_date,
+                // due_date: nodeObj.due_date,
                 title: nodeObj.title,
                 url: nodeObj.url,
                 content: nodeObj.content,
@@ -653,7 +653,7 @@ router
                 mother_line_id: nodeObj.mother_line_id,
                 branch_line_id: nodeObj.branch_line_id,
                 create_date: nodeObj.create_date,
-                due_date: nodeObj.due_date,
+                // due_date: nodeObj.due_date,
                 title: nodeObj.title,
                 url: nodeObj.url,
                 content: nodeObj.content,
@@ -674,7 +674,7 @@ router
                 content: motherlineObj.content,
                 color_RGB: motherlineObj.color_RGB,
                 create_date: motherlineObj.create_date,
-                due_date: motherlineObj.due_date,
+                // due_date: motherlineObj.due_date,
                 is_main: motherlineObj.is_main,
                 contain_branch: motherlineObj.contain_branch,
             }});
