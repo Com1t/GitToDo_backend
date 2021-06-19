@@ -4,27 +4,33 @@ const Router = require('koa-router');
 const koaBody = require('koa-body');
 const mongo = require('koa-mongo');
 const cors = require('koa-cors');
-const koaJwt = require('koa-jwt');
+const koaStatic = require('koa-static')
+const path = require('path')
+var fs = require('fs');
 
 const app = new Koa();
 const router = new Router();
 
 app.use(mongo({
     host: '140.114.91.242',
-    port: 28017,
+    user: 'mongo',
+    pass: 'sct2head',
+    port: 38017,
     db: 'git_to_do',
 }));
-app.use(koaBody());
 
-function tokenValid( expire_time ){
-    var currentdate = new Date(); 
-    if((currentdate.getTime() - expire_time) > (60*60*1000)){
-        return false;
+app.use(koaStatic(path.join(__dirname, 'avatar')))
+app.use(koaBody({
+    // 支持文件格式
+    multipart: true,
+    formidable: {
+        // 上传目录
+        uploadDir: path.join(__dirname, 'avatar'),
+        // 保留文件扩展名
+        keepExtensions: true,
     }
-    else{
-        return true;
-    }
-}
+}));
+
 
 const koaOptions = {
   origin: '*',
@@ -34,6 +40,59 @@ const koaOptions = {
 app.use(cors(koaOptions));
 
 router
+    // avatar
+    router.put('/user/avatar/:userId', async ctx => {
+        const userId = ctx.params.userId;
+        const file = ctx.request.files.file
+        const basename = path.basename(file.path)
+        
+        console.log(userId)
+        console.log(basename)
+
+        // File name regex
+        // str = 'http://140.114.91.242:3000/upload_7030e714ae137135ee65d7bf82db99e1.jpg';
+        // var re = /http:\/\/140.114.91.242:3000\/(upload_.*)/i;
+        // var file_name = str.match(re)[1];
+        // console.log(file_name);
+
+        if (userId) {
+            // Find corresponding user data
+            const userObj = await ctx.db.collection('User').findOne({_id: mongo.ObjectId(userId)});
+
+            if (userObj) {
+                if(userObj.avatar_url){
+                    var re = /http:\/\/140.114.91.242:3000\/(upload_.*)/i;
+                    var file_name = userObj.avatar_url.match(re)[1];
+                    console.log(file_name);
+                    await fs.unlink('avatar/' + file_name, function(err) {
+                        if (err) throw err;
+                        console.log('file deleted');
+                    });
+                }
+                await ctx.db.collection('User').updateOne({_id: mongo.ObjectId(userId)}, {$set: {
+                    name: userObj.name,
+                    email: userObj.email,
+                    phone_number: userObj.phone_number,
+                    account: userObj.account,
+                    password: userObj.password,
+                    avatar_url: `${ctx.origin}/${basename}`,
+                    todo_host: userObj.todo_host,
+                }});
+                await ctx.db.collection('User').findOne({_id: mongo.ObjectId(userId)})
+                .then((res) => {
+                    // ctx.body = { "url": `${ctx.origin}/${basename}` }
+                    ctx.body = res;
+                })
+                .catch((err) => {
+                    ctx.status = 400;
+                });
+            } else {
+                ctx.status = 404;
+            }
+        } else {
+            ctx.status = 400;
+        }
+    })
     // -----------------------------------------------------USER--------------------------------------------------------- //
     // Sign in
     .post('/user/signIn', async ctx => {
@@ -90,7 +149,7 @@ router
                     phone_number: phone_number,
                     account: account,
                     password: password,
-                    avatar_url: avatar_url,
+                    avatar_url: JSON.parse(avatar_url),
                     todo_host: mongo.ObjectId(new_line.insertedId),
                 }});
 
@@ -172,7 +231,7 @@ router
                     phone_number: phone_number? phone_number: userObj.phone_number,
                     account: account ? account: userObj.account,
                     password: password ? password: userObj.password,
-                    avatar_url: avatar_url ? avatar_url: userObj.avatar_url,
+                    avatar_url: avatar_url ?  JSON.parse(avatar_url): userObj.avatar_url,
                     todo_host: mongo.ObjectId(userObj.insertedId),
                 }});
                 await ctx.db.collection('User').findOne({_id: mongo.ObjectId(id)})
@@ -319,10 +378,13 @@ router
             // Find corresponding user data
             var lineObj = await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(lineId)});
             const head_node_id = (await ctx.db.collection('Node').find({mother_line_id: mongo.ObjectId(lineId)}).sort( { due_date : 1 } ).limit(1).toArray())[0]['_id'];
-            
-            if(lineObj.sharer.indexOf(userId) == -1){
-                lineObj.sharer ? (lineObj.sharer.push(userId)) : lineObj.sharer = [userId]
-                lineObj.sharer_progress? (lineObj.sharer_progress.push(head_node_id)): lineObj.sharer_progress = [head_node_id]
+            if(lineObj.sharer == null && lineObj.sharer_progress == null){
+                lineObj.sharer = [userId]
+                lineObj.sharer_progress = [head_node_id]
+            }
+            else if(lineObj.sharer.indexOf(userId) == -1){
+                lineObj.sharer = lineObj.sharer.push(userId);
+                lineObj.sharer_progress = lineObj.sharer_progress.push(head_node_id);
             }
             if (lineObj) {
                 await ctx.db.collection('Line').updateOne({_id: mongo.ObjectId(lineId)}, {$set: {
@@ -650,6 +712,51 @@ router
             ctx.status = 404;
         }
     })
+
+
+    //searchBranches
+    // .get('/line/searchBranches/:string/:offset/:amount/:sortby', async ctx => {
+    //     const string = ctx.params.string;
+    //     const offset = ctx.params.offset;
+    //     const amount = ctx.params.amount;
+    //     var sortby = ctx.params.sortby;
+
+    //     console.log(string);
+    //     console.log(offset);
+    //     console.log(amount);
+    //     console.log(sortby);
+
+    //     if (string && offset && amount && sortby) {
+    //         // translate sortby
+    //         if(sortby == 0)
+    //             sortby = 1;
+    //         else
+    //             sortby = -1;
+            
+    //         var res = await ctx.db.collection('Line').aggregate([
+    //             {
+    //               $search: {
+    //                 "text": {
+    //                     "path": "title",
+    //                     "query": "MUSK",
+    //                     "fuzzy": {}
+    //                   }
+    //               }
+    //             },
+    //             {
+    //               $project: {
+    //                 "_id": 0,
+    //                 "title": 1,
+    //                 score: { $meta: "searchScore" }
+    //               }
+    //             }
+    //           ]).toArray();
+    //           console.log(res);
+    //         // ctx.body = res;
+    //     } else {
+    //         ctx.status = 400;
+    //     }
+    // })
 
     // -----------------------------------------------------NODE--------------------------------------------------------- //
     // addNode
