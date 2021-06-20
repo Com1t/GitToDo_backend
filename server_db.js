@@ -21,78 +21,19 @@ app.use(mongo({
 
 app.use(koaStatic(path.join(__dirname, 'avatar')))
 app.use(koaBody({
-    // 支持文件格式
     multipart: true,
     formidable: {
-        // 上传目录
         uploadDir: path.join(__dirname, 'avatar'),
-        // 保留文件扩展名
         keepExtensions: true,
     }
 }));
 
-
-const koaOptions = {
-  origin: '*',
-  credentials: true
-};
-
-app.use(cors(koaOptions));
+app.use(cors({
+    origin: '*',
+    credentials: true
+}));
 
 router
-    // avatar
-    router.put('/user/avatar/:userId', async ctx => {
-        const userId = ctx.params.userId;
-        const file = ctx.request.files.file
-        const basename = path.basename(file.path)
-        
-        console.log(userId)
-        console.log(basename)
-
-        // File name regex
-        // str = 'http://140.114.91.242:3000/upload_7030e714ae137135ee65d7bf82db99e1.jpg';
-        // var re = /http:\/\/140.114.91.242:3000\/(upload_.*)/i;
-        // var file_name = str.match(re)[1];
-        // console.log(file_name);
-
-        if (userId) {
-            // Find corresponding user data
-            const userObj = await ctx.db.collection('User').findOne({_id: mongo.ObjectId(userId)});
-
-            if (userObj) {
-                if(userObj.avatar_url){
-                    var re = /http:\/\/140.114.91.242:3000\/(upload_.*)/i;
-                    var file_name = userObj.avatar_url.match(re)[1];
-                    console.log(file_name);
-                    await fs.unlink('avatar/' + file_name, function(err) {
-                        if (err) throw err;
-                        console.log('file deleted');
-                    });
-                }
-                await ctx.db.collection('User').updateOne({_id: mongo.ObjectId(userId)}, {$set: {
-                    name: userObj.name,
-                    email: userObj.email,
-                    phone_number: userObj.phone_number,
-                    account: userObj.account,
-                    password: userObj.password,
-                    avatar_url: `${ctx.origin}/${basename}`,
-                    todo_host: userObj.todo_host,
-                }});
-                await ctx.db.collection('User').findOne({_id: mongo.ObjectId(userId)})
-                .then((res) => {
-                    // ctx.body = { "url": `${ctx.origin}/${basename}` }
-                    ctx.body = res;
-                })
-                .catch((err) => {
-                    ctx.status = 400;
-                });
-            } else {
-                ctx.status = 404;
-            }
-        } else {
-            ctx.status = 400;
-        }
-    })
     // -----------------------------------------------------USER--------------------------------------------------------- //
     // Sign in
     .post('/user/signIn', async ctx => {
@@ -130,14 +71,13 @@ router
                 const new_line = await ctx.db.collection('Line').insertOne({
                     owner: mongo.ObjectId(data.insertedId),
                     permission: false,
-                    sharer: null,
-                    sharer_progress: null,
+                    is_share: false,
+                    sharerLineId: null,
                     url: null,
                     title: null,
                     content: null,
                     color_RGB: null,
                     create_date: null,
-                    due_date: null,
                     is_main: null,
                     contain_branch: 0
                 });
@@ -249,20 +189,74 @@ router
         }
     })
 
+    // avatar
+    router.put('/user/avatar/:userId', async ctx => {
+        const userId = ctx.params.userId;
+        const file = ctx.request.files.file
+        const basename = path.basename(file.path)
+        
+        console.log(userId)
+        console.log(basename)
+
+        // File name regex
+        // str = 'http://140.114.91.242:3000/upload_7030e714ae137135ee65d7bf82db99e1.jpg';
+        // var re = /http:\/\/140.114.91.242:3000\/(upload_.*)/i;
+        // var file_name = str.match(re)[1];
+        // console.log(file_name);
+
+        if (userId) {
+            // Find corresponding user data
+            const userObj = await ctx.db.collection('User').findOne({_id: mongo.ObjectId(userId)});
+
+            if (userObj) {
+                if(userObj.avatar_url){
+                    var re = /http:\/\/140.114.91.242:3000\/(upload_.*)/i;
+                    var file_name = userObj.avatar_url.match(re)[1];
+                    console.log(file_name);
+                    await fs.unlink('avatar/' + file_name, function(err) {
+                        if (err) throw err;
+                        console.log('file deleted');
+                    });
+                }
+                await ctx.db.collection('User').updateOne({_id: mongo.ObjectId(userId)}, {$set: {
+                    name: userObj.name,
+                    email: userObj.email,
+                    phone_number: userObj.phone_number,
+                    account: userObj.account,
+                    password: userObj.password,
+                    avatar_url: `${ctx.origin}/${basename}`,
+                    todo_host: userObj.todo_host,
+                }});
+                await ctx.db.collection('User').findOne({_id: mongo.ObjectId(userId)})
+                .then((res) => {
+                    // ctx.body = { "url": `${ctx.origin}/${basename}` }
+                    ctx.body = res;
+                })
+                .catch((err) => {
+                    ctx.status = 400;
+                });
+            } else {
+                ctx.status = 404;
+            }
+        } else {
+            ctx.status = 400;
+        }
+    })
+
     // -----------------------------------------------------LINE--------------------------------------------------------- //
 
     // addLine
     .post('/line/addLine', async ctx => {
         const { owner } = ctx.request.body;
         const { permission } = ctx.request.body;
-        // const { sharer } = ctx.request.body;
-        // const { sharer_progress } = ctx.request.body;
+        // no need to been updated here
+        // const { is_share } = ctx.request.body;
+        // const { sharerLineId } = ctx.request.body;
         const { url } = ctx.request.body;
         const { title } = ctx.request.body;
         const { content } = ctx.request.body;
         const { color_RGB } = ctx.request.body;
         const { create_date } = ctx.request.body;
-        // const { due_date } = ctx.request.body;
         const { is_main } = ctx.request.body;
         // no need to been updated here
         // const { contain_branch } = ctx.request.body;
@@ -272,14 +266,13 @@ router
             const new_line = await ctx.db.collection('Line').insertOne({
                 owner: mongo.ObjectId(owner),
                 permission: JSON.parse(permission),
-                sharer: null,
-                sharer_progress: null,
+                is_share: false,
+                sharerLineId: null,
                 url: JSON.parse(url),
                 title,
                 content: JSON.parse(content),
                 color_RGB: JSON.parse(color_RGB),
                 create_date: (new Date(create_date)),
-                // due_date: (new Date(due_date)),
                 is_main: JSON.parse(is_main),
                 contain_branch: 0
             });
@@ -303,15 +296,16 @@ router
 
         const { owner } = ctx.request.body;
         const { permission } = ctx.request.body;
-        const { sharer } = ctx.request.body;
-        const { sharer_progress } = ctx.request.body;
+        // no need to been updated here
+        const { is_share } = ctx.request.body;
+        const { sharerLineId } = ctx.request.body;
         const { url } = ctx.request.body;
         const { title } = ctx.request.body;
         const { content } = ctx.request.body;
         const { color_RGB } = ctx.request.body;
         const { create_date } = ctx.request.body;
-        // const { due_date } = ctx.request.body;
         const { is_main } = ctx.request.body;
+        // no need to been updated here
         const { contain_branch } = ctx.request.body;
 
         if (id) {
@@ -322,14 +316,13 @@ router
                 await ctx.db.collection('Line').updateOne({_id: mongo.ObjectId(id)}, {$set: {
                     owner: owner,
                     permission: permission ? JSON.parse(permission): lineObj.permission,
-                    sharer: sharer ? sharer: lineObj.sharer,
-                    sharer_progress: sharer_progress ? sharer_progress : lineObj.sharer_progress,
+                    is_share: is_share ? JSON.parse(is_share): lineObj.is_share,
+                    sharerLineId: sharerLineId ? mongo.ObjectId(sharerLineId) : lineObj.sharerLineId,
                     url: url ? JSON.parse(url): lineObj.url,
                     title: title ? title: lineObj.title,
                     content: content ? JSON.parse(content): lineObj.content,
                     color_RGB: color_RGB ? JSON.parse(color_RGB): lineObj.color_RGB,
                     create_date: create_date ? (new Date(create_date)): lineObj.create_date,
-                    // due_date: due_date ? (new Date(due_date)): lineObj.due_date,
                     is_main: is_main ? JSON.parse(is_main): lineObj.is_main,
                     contain_branch: contain_branch ? Number(contain_branch): lineObj.contain_branch,
                 }});
@@ -369,89 +362,210 @@ router
         }       
     })
 
-    // shareLine
-    .put('/line/shareLine/:lineId/:userId', async ctx => {
+    // deleteLine
+    .delete('/line/deleteLine/:lineId', async ctx => {
+        // 把資料分別存在 id 變數
         const lineId = ctx.params.lineId;
-        const userId = ctx.params.userId;
 
-        if (userId && lineId) {
-            // Find corresponding user data
-            var lineObj = await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(lineId)});
-            const head_node_id = (await ctx.db.collection('Node').find({mother_line_id: mongo.ObjectId(lineId)}).sort( { due_date : 1 } ).limit(1).toArray())[0]['_id'];
-            if(lineObj.sharer == null && lineObj.sharer_progress == null){
-                lineObj.sharer = [userId]
-                lineObj.sharer_progress = [head_node_id]
-            }
-            else if(lineObj.sharer.indexOf(userId) == -1){
-                lineObj.sharer = lineObj.sharer.push(userId);
-                lineObj.sharer_progress = lineObj.sharer_progress.push(head_node_id);
-            }
+        if (lineId) {
+            const lineObj = await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(lineId)});
+            console.log(lineObj)
             if (lineObj) {
-                await ctx.db.collection('Line').updateOne({_id: mongo.ObjectId(lineId)}, {$set: {
-                    owner: lineObj.owner,
-                    owner: lineObj.permission,
-                    sharer: lineObj.sharer,
-                    sharer_progress: lineObj.sharer_progress,
-                    url: lineObj.url,
-                    title: lineObj.title,
-                    content: lineObj.content,
-                    color_RGB: lineObj.color_RGB,
-                    create_date: lineObj.create_date,
-                    // due_date: lineObj.due_date,
-                    is_main: lineObj.is_main,
-                    contain_branch: lineObj.contain_branch,
-                }});
-                
-                ctx.status = 200;      
+                await ctx.db.collection('Line').remove({_id: mongo.ObjectId(lineId)});
+                await ctx.db.collection('Node').remove({mother_line_id: mongo.ObjectId(lineId)});
+                ctx.status = 200;
             } else {
+                // 沒有找到的話就依照文件回傳 404
                 ctx.status = 404;
             }
         } else {
+            // 如果沒送 id，文章就不存在，就依照文件回傳 404
+            ctx.status = 404;
+        }
+    })
+
+    // -----------------------------------------------------SHARE LINE--------------------------------------------------------- //
+    // shareLine
+    .post('/line/shareLine', async ctx => {
+        const { sharerLineId } = ctx.request.body;
+        const { sharederUserId } = ctx.request.body;
+        const { sharederNodeId } = ctx.request.body;
+
+        if (sharerLineId && sharederUserId && sharederNodeId) {
+            // COPY LINE
+            // Find corresponding user data
+            var sharerLineObj = await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(sharerLineId)});
+            const sharederUserObj = await ctx.db.collection('User').findOne({_id: mongo.ObjectId(sharederUserId)});
+            
+            // insert new line into DB
+            var currentdate = new Date(); 
+            var shareder_line = await ctx.db.collection('Line').insertOne({
+                owner: sharederUserObj._id,
+                permission: false,
+                is_share: true,
+                sharerLineId: sharerLineId,
+                url: sharerLineObj.url,
+                title: sharerLineObj.title,
+                content: sharerLineObj.content,
+                color_RGB: sharerLineObj.color_RGB,
+                create_date: currentdate,
+                is_main: true,
+                contain_branch: 0,
+            });
+
+            // update original line's 'is_share' and 'sharerLineId' attributes
+            await ctx.db.collection('Line').updateOne({_id: mongo.ObjectId(sharerLineId)}, {$set: {
+                owner: sharerLineObj.owner,
+                permission: sharerLineObj.permission,
+                is_share: true,
+                sharerLineId: sharerLineId,
+                url: sharerLineObj.url,
+                title: sharerLineObj.title,
+                content: sharerLineObj.content,
+                color_RGB: sharerLineObj.color_RGB,
+                create_date: sharerLineObj.create_date,
+                is_main: sharerLineObj.is_main,
+                contain_branch: sharerLineObj.contain_branch,
+            }});
+
+            // copy node and restore them to initial state
+            var res = await ctx.db.collection('Node').find({mother_line_id: mongo.ObjectId(sharerLineId)}).toArray();
+            for(node of res){
+                delete node['_id'];
+                node['mother_line_id'] = shareder_line.insertedId;
+                node['branch_line_id'] = null;
+                node['achieved'] = false;
+                node['achieved_at'] = null;
+            }
+            await ctx.db.collection('Node').insertMany(res);
+
+            // get new inserted result
+            // var sharederLineObj = await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(shareder_line.insertedId)});
+
+            // add branch onto shareder node
+
+            // Find corresponding node data
+            var sharederNodeObj = await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(sharederNodeId)});
+
+            // update original line
+            var sharederMotherLineObj = await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(sharederNodeObj.mother_line_id)});
+            sharederMotherLineObj.contain_branch = sharederMotherLineObj.contain_branch + 1;
+            await ctx.db.collection('Line').updateOne({_id: mongo.ObjectId(sharerLineId)}, {$set: {
+                owner: sharederMotherLineObj.owner,
+                permission: sharederMotherLineObj.permission,
+                is_share: sharederMotherLineObj.is_share,
+                sharerLineId: sharederMotherLineObj.sharerLineId,
+                url: sharederMotherLineObj.url,
+                title: sharederMotherLineObj.title,
+                content: sharederMotherLineObj.content,
+                color_RGB: sharederMotherLineObj.color_RGB,
+                create_date: sharederMotherLineObj.create_date,
+                is_main: sharederMotherLineObj.is_main,
+                contain_branch: sharederMotherLineObj.contain_branch,
+            }});
+
+            // set branch line id onto node
+            sharederNodeObj.branch_line_id ? (sharederNodeObj.branch_line_id.push(shareder_line.insertedId)) : sharederNodeObj.branch_line_id = [shareder_line.insertedId];
+            await ctx.db.collection('Node').updateOne({_id: mongo.ObjectId(sharederNodeId)}, {$set: {
+                mother_line_id: sharederNodeObj.mother_line_id,
+                branch_line_id: sharederNodeObj.branch_line_id,
+                create_date: sharederNodeObj.create_date,
+                due_date: sharederNodeObj.due_date,
+                title: sharederNodeObj.title,
+                url: sharederNodeObj.url,
+                content: sharederNodeObj.content,
+                achieved: sharederNodeObj.achieved,
+                achieved_at: sharederNodeObj.achieved_at,
+                importance: sharederNodeObj.importance,
+            }});
+
+            var shareExist = await ctx.db.collection('Share').find({sharerLineId: mongo.ObjectId(sharerLineId)}).limit(1).count();
+            console.log(shareExist)
+            console.log("shareExist")
+            if(shareExist === 1){
+                var shareObj = await ctx.db.collection('Share').findOne({sharerLineId: mongo.ObjectId(sharerLineId)});
+                
+                shareObj.shreder.push({shareder_user_id: mongo.ObjectId(sharederUserId), shareder_line_id: shareder_line.insertedId, shareder_progress: Number(-1)});
+                
+                await ctx.db.collection('Share').updateOne({_id: mongo.ObjectId(shareObj._id)}, {$set: {
+                    sharerLineId: mongo.ObjectId(shareObj.sharerLineId),
+                    shreder: shareObj.shreder
+                }});
+            }
+            else{
+                await ctx.db.collection('Share').insertOne({
+                    sharerLineId: mongo.ObjectId(sharerLineId),
+                    shreder: [{shareder_user_id: mongo.ObjectId(sharederUserId), shareder_line_id: shareder_line.insertedId, shareder_progress: Number(-1)}]
+                });
+            }
+            // // return inserted result
+            await ctx.db.collection('Share').findOne({sharerLineId: mongo.ObjectId(sharerLineId)})
+            .then((res) => {
+                ctx.body = res;
+            })
+            .catch((err) => {
+                ctx.status = 400;
+            });
+        } else {
             ctx.status = 400;
-        }       
+        }
     })
 
 
     // setShareProgress
-    .put('/line/setShareProgress/:lineId/:userId/:nodeId', async ctx => {
-        const lineId = ctx.params.lineId;
-        const userId = ctx.params.userId;
-        const nodeId = ctx.params.nodeId;
+    .put('/line/setShareProgress/:sharerLineId/:sharederUserId/:sharederUserProgress', async ctx => {
+        const sharerLineId = ctx.params.sharerLineId;
+        const sharederUserId = ctx.params.sharederUserId;
+        const sharederUserProgress = ctx.params.sharederUserProgress;
 
-        if (userId && lineId && nodeId) {
+        if (sharerLineId && sharederUserId && sharederUserProgress) {
             // Find corresponding user data
-            var lineObj = await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(lineId)});
-            
-            idxOfuser = lineObj.sharer.indexOf(userId);
-            if( idxOfuser == -1 ){
-                ctx.status = 404;
-            }{
-                lineObj.sharer_progress[idxOfuser] = nodeId;
-            }
+            var shareObj = await ctx.db.collection('Share').findOne({sharerLineId: mongo.ObjectId(sharerLineId)});
 
-            if (lineObj) {
-                await ctx.db.collection('Line').updateOne({_id: mongo.ObjectId(lineId)}, {$set: {
-                    owner: lineObj.owner,
-                    permission: lineObj.permission,
-                    sharer: lineObj.sharer,
-                    sharer_progress: lineObj.sharer_progress,
-                    url: lineObj.url,
-                    title: lineObj.title,
-                    content: lineObj.content,
-                    color_RGB: lineObj.color_RGB,
-                    create_date: lineObj.create_date,
-                    // due_date: lineObj.due_date,
-                    is_main: lineObj.is_main,
-                    contain_branch: lineObj.contain_branch,
+            if (shareObj) {
+                for(shareder of shareObj.shreder){
+                    if(shareder['shareder_user_id'] == sharederUserId){
+                        shareder['shareder_progress'] = Number(sharederUserProgress);
+                    }
+                }
+
+                await ctx.db.collection('Share').updateOne({_id: mongo.ObjectId(shareObj._id)}, {$set: {
+                    sharerLineId: mongo.ObjectId(shareObj.sharerLineId),
+                    shreder: shareObj.shreder
                 }});
                 
-                ctx.status = 200;      
+                // return inserted result
+                await ctx.db.collection('Share').findOne({sharerLineId: mongo.ObjectId(sharerLineId)})
+                .then((res) => {
+                    ctx.body = res;
+                })
+                .catch((err) => {
+                    ctx.status = 400;
+                });    
             } else {
                 ctx.status = 404;
             }
         } else {
             ctx.status = 400;
-        }       
+        }
+    })
+
+    // getShareProgress
+    .get('/line/getShareProgress/:sharerLineId', async ctx => {
+        const sharerLineId = ctx.params.sharerLineId;
+
+        if (sharerLineId) {
+            // Find corresponding user data
+            await ctx.db.collection('Share').findOne({sharerLineId: mongo.ObjectId(sharerLineId)})
+            .then((res) => {
+                ctx.body = res;
+            })
+            .catch((err) => {
+                ctx.status = 400;
+            });
+        } else {
+            ctx.status = 400;
+        }
     })
 
     // copyLine
@@ -461,22 +575,21 @@ router
         
         if (userId && lineId) {
             // Find corresponding user data
-            const userObj = await ctx.db.collection('User').findOne({_id: mongo.ObjectId(userId)});
             const lineObj = await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(lineId)});
+            const userObj = await ctx.db.collection('User').findOne({_id: mongo.ObjectId(userId)});
             
             var currentdate = new Date(); 
             // insert new line into DB
-            const new_node = await ctx.db.collection('Line').insertOne({
+            const new_line = await ctx.db.collection('Line').insertOne({
                 owner: userObj._id,
                 permission: false,
-                sharer: null,
-                sharer_progress: null,
+                is_share: false,
+                sharerLineId: null,
                 url: lineObj.url,
                 title: lineObj.title,
                 content: lineObj.content,
                 color_RGB: lineObj.color_RGB,
                 create_date: currentdate,
-                // due_date: lineObj.due_date,
                 is_main: false,
                 contain_branch: 0,
             });
@@ -485,13 +598,16 @@ router
             
             for(node of res){
                 delete node['_id'];
-                node['mother_line_id'] = new_node.insertedId;
+                node['mother_line_id'] = new_line.insertedId;
+                node['branch_line_id'] = null;
+                node['achieved'] = false;
+                node['achieved_at'] = null;
             }
 
             await ctx.db.collection('Node').insertMany(res);
 
             // return inserted result
-            await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(new_node.insertedId)})
+            await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(new_line.insertedId)})
             .then((res) => {
                 ctx.body = res;
             })
@@ -549,20 +665,21 @@ router
         }       
     })
 
+    // -----------------------------------------------------BRANCH LINE--------------------------------------------------------- //
     // addBranch
     .post('/line/addBranch', async ctx => {
         const { nodeId } = ctx.request.body;
 
         const { owner } = ctx.request.body;
         const { permission } = ctx.request.body;
-        // const { sharer } = ctx.request.body;
-        // const { sharer_progress } = ctx.request.body;
+        // no need to been updated here
+        // const { is_share } = ctx.request.body;
+        // const { sharerLineId } = ctx.request.body;
         const { url } = ctx.request.body;
         const { title } = ctx.request.body;
         const { content } = ctx.request.body;
         const { color_RGB } = ctx.request.body;
         const { create_date } = ctx.request.body;
-        // const { due_date } = ctx.request.body;
         const { is_main } = ctx.request.body;
         // no need to been updated here
         // const { contain_branch } = ctx.request.body;
@@ -577,14 +694,13 @@ router
             await ctx.db.collection('Line').updateOne({_id: mongo.ObjectId(lineObj._id)}, {$set: {
                 owner: lineObj.owner,
                 permission: lineObj.permission,
-                sharer: lineObj.sharer,
-                sharer_progress: lineObj.sharer_progress,
+                is_share: lineObj.is_share,
+                sharerLineId: lineObj.sharerLineId,
                 url: lineObj.url,
                 title: lineObj.title,
                 content: lineObj.content,
                 color_RGB: lineObj.color_RGB,
                 create_date: lineObj.create_date,
-                // due_date: lineObj.due_date,
                 is_main: lineObj.is_main,
                 contain_branch: lineObj.contain_branch,
             }});
@@ -593,14 +709,13 @@ router
             const new_line = await ctx.db.collection('Line').insertOne({
                 owner: mongo.ObjectId(owner),
                 permission,
-                sharer: null,
-                sharer_progress: null,
+                is_share: false,
+                sharerLineId: null,
                 url,
                 title,
                 content,
                 color_RGB: JSON.parse(color_RGB),
                 create_date: (new Date(create_date)),
-                // due_date: (new Date(due_date)),
                 is_main,
                 contain_branch: 0
             });
@@ -611,7 +726,7 @@ router
                 mother_line_id: nodeObj.mother_line_id,
                 branch_line_id: nodeObj.branch_line_id,
                 create_date: nodeObj.create_date,
-                // due_date: nodeObj.due_date,
+                due_date: nodeObj.due_date,
                 title: nodeObj.title,
                 url: nodeObj.url,
                 content: nodeObj.content,
@@ -641,7 +756,7 @@ router
         const lineId = ctx.params.lineId;
 
         if (nodeId && lineId) {
-            // Find corresponding user data
+            // Find corresponding branch line data and remove
             var nodeObj = await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(nodeId)});
             for(idx in nodeObj.branch_line_id){
                 if(nodeObj.branch_line_id[idx] == lineId){
@@ -653,7 +768,7 @@ router
                 mother_line_id: nodeObj.mother_line_id,
                 branch_line_id: nodeObj.branch_line_id,
                 create_date: nodeObj.create_date,
-                // due_date: nodeObj.due_date,
+                due_date: nodeObj.due_date,
                 title: nodeObj.title,
                 url: nodeObj.url,
                 content: nodeObj.content,
@@ -667,14 +782,13 @@ router
             await ctx.db.collection('Line').updateOne({_id: mongo.ObjectId(motherlineObj._id)}, {$set: {
                 owner: motherlineObj.owner,
                 permission: motherlineObj.permission,
-                sharer: motherlineObj.sharer,
-                sharer_progress: motherlineObj.sharer_progress,
+                is_share: motherlineObj.sharer,
+                sharerLineId: motherlineObj.sharer_progress,
                 url: motherlineObj.url,
                 title: motherlineObj.title,
                 content: motherlineObj.content,
                 color_RGB: motherlineObj.color_RGB,
                 create_date: motherlineObj.create_date,
-                // due_date: motherlineObj.due_date,
                 is_main: motherlineObj.is_main,
                 contain_branch: motherlineObj.contain_branch,
             }});
@@ -685,28 +799,6 @@ router
             
             ctx.status = 200;
 
-        } else {
-            // 如果沒送 id，文章就不存在，就依照文件回傳 404
-            ctx.status = 404;
-        }
-    })
-
-    // deleteLine
-    .delete('/line/deleteLine/:lineId', async ctx => {
-        // 把資料分別存在 id 變數
-        const lineId = ctx.params.lineId;
-
-        if (lineId) {
-            const lineObj = await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(lineId)});
-            console.log(lineObj)
-            if (lineObj) {
-                await ctx.db.collection('Line').remove({_id: mongo.ObjectId(lineId)});
-                await ctx.db.collection('Node').remove({mother_line_id: mongo.ObjectId(lineId)});
-                ctx.status = 200;
-            } else {
-                // 沒有找到的話就依照文件回傳 404
-                ctx.status = 404;
-            }
         } else {
             // 如果沒送 id，文章就不存在，就依照文件回傳 404
             ctx.status = 404;
@@ -800,6 +892,103 @@ router
         }
     })
 
+    // getNode
+    .get('/node/getNode/:id', async ctx => {
+        const id = ctx.params.id;
+
+        if (id) {
+            // Find corresponding user data
+            const nodeObj = await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(id)});
+            
+            if (nodeObj) {
+                ctx.body = nodeObj;
+                ctx.status = 200;      
+            } else {
+                ctx.status = 404;
+            }
+        } else {
+            ctx.status = 400;
+        }       
+    })
+
+    // modifyNode
+    .put('/node/modifyNode/:id', async ctx => {
+        const id = ctx.params.id;
+        // const { mother_line_id } = ctx.request.body;
+        // const { branch_line_id } = ctx.request.body;
+        const { create_date } = ctx.request.body;
+        const { due_date } = ctx.request.body;
+        const { title } = ctx.request.body;
+        const { url } = ctx.request.body;
+        const { content } = ctx.request.body;
+        const { achieved } = ctx.request.body;
+        const { achieved_at } = ctx.request.body;
+        const { importance } = ctx.request.body;
+
+        if (id) {
+            const nodeObj = await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(id)});
+            console.log(nodeObj)
+            
+            if (nodeObj) {
+                await ctx.db.collection('Node').updateOne({_id: mongo.ObjectId(id)}, {$set: {
+                    mother_line_id: nodeObj.mother_line_id,
+                    branch_line_id: nodeObj.branch_line_id,
+                    create_date: create_date ? (new Date(create_date)): nodeObj.create_date,
+                    due_date: due_date ? (new Date(due_date)): nodeObj.due_date,
+                    title: title ? title: nodeObj.title,
+                    url: url ? JSON.parse(url): nodeObj.url,
+                    content: content ? JSON.parse(content): nodeObj.content,
+                    achieved: achieved ? JSON.parse(achieved): nodeObj.achieved,
+                    achieved_at: achieved_at ? (new Date(achieved_at)): nodeObj.achieved_at,
+                    importance: importance ? JSON.parse(importance): nodeObj.importance,
+                }});
+
+                await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(id)})
+                .then((res) => {
+                    ctx.body = res;
+                })
+                .catch((err) => {
+                    ctx.status = 400;
+                });
+            } else {
+                // Failed
+                ctx.status = 404;
+            }
+        } 
+        else {
+            // Failed
+            ctx.status = 404;
+        }
+
+    })
+
+    // deleteNode
+    .delete('/node/deleteNode/:lineId/:nodeId', async ctx => {
+        // 把資料分別存在 id 變數
+        const lineId = ctx.params.lineId;
+        const nodeId = ctx.params.nodeId;
+
+        if (lineId && nodeId) {
+            const nodeObj = await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(nodeId)});
+            
+            if (nodeObj) {
+                await ctx.db.collection('Node').remove({_id: mongo.ObjectId(nodeId)});
+                const res = await ctx.db.collection('Node').findOne({mother_line_id: mongo.ObjectId(lineId)});
+                if(res == null){
+                    await ctx.db.collection('Line').remove({_id: mongo.ObjectId(lineId)})
+                }
+                ctx.status = 200;
+            } else {
+                // 沒有找到的話就依照文件回傳 404
+                ctx.status = 404;
+            }
+        } else {
+            // 如果沒送 id，文章就不存在，就依照文件回傳 404
+            ctx.status = 404;
+        }    
+    })
+
+    // -----------------------------------------------------TASK--------------------------------------------------------- //
     // addSubTask
     .post('/node/addSubTask', async ctx => {
         const { nodeId } = ctx.request.body;
@@ -927,102 +1116,6 @@ router
             // 如果有欄位沒有填，就依照文件回傳 400
             ctx.status = 400;
         }
-    })
-
-    // getNode
-    .get('/node/getNode/:id', async ctx => {
-        const id = ctx.params.id;
-
-        if (id) {
-            // Find corresponding user data
-            const nodeObj = await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(id)});
-            
-            if (nodeObj) {
-                ctx.body = nodeObj;
-                ctx.status = 200;      
-            } else {
-                ctx.status = 404;
-            }
-        } else {
-            ctx.status = 400;
-        }       
-    })
-
-    // modifyNode
-    .put('/node/modifyNode/:id', async ctx => {
-        const id = ctx.params.id;
-        // const { mother_line_id } = ctx.request.body;
-        // const { branch_line_id } = ctx.request.body;
-        const { create_date } = ctx.request.body;
-        const { due_date } = ctx.request.body;
-        const { title } = ctx.request.body;
-        const { url } = ctx.request.body;
-        const { content } = ctx.request.body;
-        const { achieved } = ctx.request.body;
-        const { achieved_at } = ctx.request.body;
-        const { importance } = ctx.request.body;
-
-        if (id) {
-            const nodeObj = await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(id)});
-            console.log(nodeObj)
-            
-            if (nodeObj) {
-                await ctx.db.collection('Node').updateOne({_id: mongo.ObjectId(id)}, {$set: {
-                    mother_line_id: nodeObj.mother_line_id,
-                    branch_line_id: nodeObj.branch_line_id,
-                    create_date: create_date ? (new Date(create_date)): nodeObj.create_date,
-                    due_date: due_date ? (new Date(due_date)): nodeObj.due_date,
-                    title: title ? title: nodeObj.title,
-                    url: url ? JSON.parse(url): nodeObj.url,
-                    content: content ? JSON.parse(content): nodeObj.content,
-                    achieved: achieved ? JSON.parse(achieved): nodeObj.achieved,
-                    achieved_at: achieved_at ? (new Date(achieved_at)): nodeObj.achieved_at,
-                    importance: importance ? JSON.parse(importance): nodeObj.importance,
-                }});
-
-                await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(id)})
-                .then((res) => {
-                    ctx.body = res;
-                })
-                .catch((err) => {
-                    ctx.status = 400;
-                });
-            } else {
-                // Failed
-                ctx.status = 404;
-            }
-        } 
-        else {
-            // Failed
-            ctx.status = 404;
-        }
-
-    })
-
-    // deleteNode
-    .delete('/node/deleteNode/:lineId/:nodeId', async ctx => {
-        // 把資料分別存在 id 變數
-        const lineId = ctx.params.lineId;
-        const nodeId = ctx.params.nodeId;
-
-        if (lineId && nodeId) {
-            const nodeObj = await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(nodeId)});
-            
-            if (nodeObj) {
-                await ctx.db.collection('Node').remove({_id: mongo.ObjectId(nodeId)});
-                const res = await ctx.db.collection('Node').findOne({mother_line_id: mongo.ObjectId(lineId)});
-                if(res == null){
-                    await ctx.db.collection('Line').remove({_id: mongo.ObjectId(lineId)})
-                }
-                ctx.status = 200;
-            } else {
-                // 沒有找到的話就依照文件回傳 404
-                ctx.status = 404;
-            }
-        } else {
-            // 如果沒送 id，文章就不存在，就依照文件回傳 404
-            ctx.status = 404;
-        }    
     });
     
 app.use(router.routes());
