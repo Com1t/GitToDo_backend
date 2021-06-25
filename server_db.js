@@ -89,7 +89,7 @@ router
                     phone_number: phone_number,
                     account: account,
                     password: password,
-                    avatar_url: JSON.parse(avatar_url),
+                    avatar_url: avatar_url,
                     todo_host: mongo.ObjectId(new_line.insertedId),
                 }});
 
@@ -238,6 +238,34 @@ router
             } else {
                 ctx.status = 404;
             }
+        } else {
+            ctx.status = 400;
+        }
+    })
+
+    //searchUsers
+    .get('/user/searchUsers/:string/:offset/:amount', async ctx => {
+        const string = ctx.params.string;
+        const offset = ctx.params.offset;
+        const amount = ctx.params.amount;
+
+        console.log(string);
+        console.log(offset);
+        console.log(amount);
+
+        if (string && offset && amount) {            
+            var res = await ctx.db.collection('User').find({}).toArray();
+            var matched_content = [];
+
+            var re = new RegExp(`(.*)${string}(.*)`, 'i');
+            for(user of res){
+                if(user['name'].match(re) !== null){
+                    matched_content.push(user);
+                }
+            }
+            console.log(matched_content);
+            console.log(matched_content.slice( Number(offset), Number(offset) + Number(amount)));
+            ctx.body = matched_content.slice( Number(offset), Number(offset) + Number(amount));
         } else {
             ctx.status = 400;
         }
@@ -595,16 +623,20 @@ router
             });
 
             var res = await ctx.db.collection('Node').find({mother_line_id: mongo.ObjectId(lineId)}).toArray();
-            
+            var solid_content = [];
+
             for(node of res){
                 delete node['_id'];
-                node['mother_line_id'] = new_line.insertedId;
-                node['branch_line_id'] = null;
-                node['achieved'] = false;
-                node['achieved_at'] = null;
+                if(node['branch_line_id'] === null){
+                    node['mother_line_id'] = new_line.insertedId;
+                    node['branch_line_id'] = null;
+                    node['achieved'] = false;
+                    node['achieved_at'] = null;
+                    solid_content.push(node);
+                }
             }
-
-            await ctx.db.collection('Node').insertMany(res);
+            
+            await ctx.db.collection('Node').insertMany(solid_content);
 
             // return inserted result
             await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(new_line.insertedId)})
@@ -807,48 +839,37 @@ router
 
 
     //searchBranches
-    // .get('/line/searchBranches/:string/:offset/:amount/:sortby', async ctx => {
-    //     const string = ctx.params.string;
-    //     const offset = ctx.params.offset;
-    //     const amount = ctx.params.amount;
-    //     var sortby = ctx.params.sortby;
+    .get('/line/searchBranches/:string/:offset/:amount', async ctx => {
+        const string = ctx.params.string;
+        const offset = ctx.params.offset;
+        const amount = ctx.params.amount;
 
-    //     console.log(string);
-    //     console.log(offset);
-    //     console.log(amount);
-    //     console.log(sortby);
+        console.log(string);
+        console.log(offset);
+        console.log(amount);
 
-    //     if (string && offset && amount && sortby) {
-    //         // translate sortby
-    //         if(sortby == 0)
-    //             sortby = 1;
-    //         else
-    //             sortby = -1;
-            
-    //         var res = await ctx.db.collection('Line').aggregate([
-    //             {
-    //               $search: {
-    //                 "text": {
-    //                     "path": "title",
-    //                     "query": "MUSK",
-    //                     "fuzzy": {}
-    //                   }
-    //               }
-    //             },
-    //             {
-    //               $project: {
-    //                 "_id": 0,
-    //                 "title": 1,
-    //                 score: { $meta: "searchScore" }
-    //               }
-    //             }
-    //           ]).toArray();
-    //           console.log(res);
-    //         // ctx.body = res;
-    //     } else {
-    //         ctx.status = 400;
-    //     }
-    // })
+        if (string && offset && amount) {            
+            var res = await ctx.db.collection('Line').find({permission: true}).toArray();
+            var matched_content = [];
+            // File name regex
+            // str = 'http://140.114.91.242:3000/10asdfupload_7030e714ae137135ee65d7bf82db99e1.jpg';
+            // var re = new RegExp(`(.*)${string}(upload_.*)`);
+            // console.log(re);
+            // console.log(str.match(re));
+
+            var re = new RegExp(`(.*)${string}(.*)`, 'i');
+            for(line of res){
+                if(line['title'].match(re) !== null){
+                    matched_content.push(line);
+                }
+            }
+            console.log(matched_content);
+            console.log(matched_content.slice( Number(offset), Number(offset) + Number(amount)));
+            ctx.body = matched_content.slice( Number(offset), Number(offset) + Number(amount));
+        } else {
+            ctx.status = 400;
+        }
+    })
 
     // -----------------------------------------------------NODE--------------------------------------------------------- //
     // addNode
@@ -915,7 +936,7 @@ router
     .put('/node/modifyNode/:id', async ctx => {
         const id = ctx.params.id;
         // const { mother_line_id } = ctx.request.body;
-        // const { branch_line_id } = ctx.request.body;
+        const { branch_line_id } = ctx.request.body;
         const { create_date } = ctx.request.body;
         const { due_date } = ctx.request.body;
         const { title } = ctx.request.body;
@@ -924,7 +945,7 @@ router
         const { achieved } = ctx.request.body;
         const { achieved_at } = ctx.request.body;
         const { importance } = ctx.request.body;
-
+        console.log(branch_line_id)
         if (id) {
             const nodeObj = await ctx.db.collection('Node').findOne({_id: mongo.ObjectId(id)});
             console.log(nodeObj)
@@ -932,7 +953,7 @@ router
             if (nodeObj) {
                 await ctx.db.collection('Node').updateOne({_id: mongo.ObjectId(id)}, {$set: {
                     mother_line_id: nodeObj.mother_line_id,
-                    branch_line_id: nodeObj.branch_line_id,
+                    branch_line_id: branch_line_id ? JSON.parse(branch_line_id): nodeObj.branch_line_id,
                     create_date: create_date ? (new Date(create_date)): nodeObj.create_date,
                     due_date: due_date ? (new Date(due_date)): nodeObj.due_date,
                     title: title ? title: nodeObj.title,
