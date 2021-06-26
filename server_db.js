@@ -422,7 +422,7 @@ router
         if (sharerLineId && sharederUserId && sharederNodeId) {
             // COPY LINE
             // Find corresponding user data
-            var sharerLineObj = await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(sharerLineId)});
+            const sharerLineObj = await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(sharerLineId)});
             const sharederUserObj = await ctx.db.collection('User').findOne({_id: mongo.ObjectId(sharederUserId)});
             
             // insert new line into DB
@@ -478,7 +478,7 @@ router
             // update original line
             var sharederMotherLineObj = await ctx.db.collection('Line').findOne({_id: mongo.ObjectId(sharederNodeObj.mother_line_id)});
             sharederMotherLineObj.contain_branch = sharederMotherLineObj.contain_branch + 1;
-            await ctx.db.collection('Line').updateOne({_id: mongo.ObjectId(sharerLineId)}, {$set: {
+            await ctx.db.collection('Line').updateOne({_id: mongo.ObjectId(sharederMotherLineObj._id)}, {$set: {
                 owner: sharederMotherLineObj.owner,
                 permission: sharederMotherLineObj.permission,
                 is_share: sharederMotherLineObj.is_share,
@@ -512,18 +512,19 @@ router
             console.log("shareExist")
             if(shareExist === 1){
                 var shareObj = await ctx.db.collection('Share').findOne({sharerLineId: mongo.ObjectId(sharerLineId)});
-                
-                shareObj.shreder.push({shareder_user_id: mongo.ObjectId(sharederUserId), shareder_line_id: shareder_line.insertedId, shareder_progress: Number(-1)});
+                // shareder
+                shareObj.shareder.push({shareder_user_id: mongo.ObjectId(sharederUserId), shareder_line_id: shareder_line.insertedId, shareder_progress: Number(-1)});
                 
                 await ctx.db.collection('Share').updateOne({_id: mongo.ObjectId(shareObj._id)}, {$set: {
                     sharerLineId: mongo.ObjectId(shareObj.sharerLineId),
-                    shreder: shareObj.shreder
+                    shareder: shareObj.shareder
                 }});
             }
             else{
                 await ctx.db.collection('Share').insertOne({
                     sharerLineId: mongo.ObjectId(sharerLineId),
-                    shreder: [{shareder_user_id: mongo.ObjectId(sharederUserId), shareder_line_id: shareder_line.insertedId, shareder_progress: Number(-1)}]
+                    shareder: [{shareder_user_id: mongo.ObjectId(sharerLineObj.owner), shareder_line_id: sharerLineId, shareder_progress: Number(-1)},
+                               {shareder_user_id: mongo.ObjectId(sharederUserId), shareder_line_id: shareder_line.insertedId, shareder_progress: Number(-1)}]
                 });
             }
             // // return inserted result
@@ -551,7 +552,7 @@ router
             var shareObj = await ctx.db.collection('Share').findOne({sharerLineId: mongo.ObjectId(sharerLineId)});
 
             if (shareObj) {
-                for(shareder of shareObj.shreder){
+                for(shareder of shareObj.shareder){
                     if(shareder['shareder_user_id'] == sharederUserId){
                         shareder['shareder_progress'] = Number(sharederUserProgress);
                     }
@@ -559,7 +560,7 @@ router
 
                 await ctx.db.collection('Share').updateOne({_id: mongo.ObjectId(shareObj._id)}, {$set: {
                     sharerLineId: mongo.ObjectId(shareObj.sharerLineId),
-                    shreder: shareObj.shreder
+                    shareder: shareObj.shareder
                 }});
                 
                 // return inserted result
@@ -994,10 +995,10 @@ router
             
             if (nodeObj) {
                 await ctx.db.collection('Node').remove({_id: mongo.ObjectId(nodeId)});
-                const res = await ctx.db.collection('Node').findOne({mother_line_id: mongo.ObjectId(lineId)});
-                if(res == null){
-                    await ctx.db.collection('Line').remove({_id: mongo.ObjectId(lineId)})
-                }
+                // const res = await ctx.db.collection('Node').findOne({mother_line_id: mongo.ObjectId(lineId)});
+                // if(res == null){
+                //     await ctx.db.collection('Line').remove({_id: mongo.ObjectId(lineId)})
+                // }
                 ctx.status = 200;
             } else {
                 // 沒有找到的話就依照文件回傳 404
