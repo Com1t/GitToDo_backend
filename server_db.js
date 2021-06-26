@@ -78,7 +78,7 @@ router
                     content: null,
                     color_RGB: null,
                     create_date: null,
-                    is_main: null,
+                    is_main: false,
                     contain_branch: 0
                 });
 
@@ -741,7 +741,7 @@ router
             // insert new line into DB
             const new_line = await ctx.db.collection('Line').insertOne({
                 owner: mongo.ObjectId(owner),
-                permission,
+                permission: JSON.parse(permission),
                 is_share: false,
                 sharerLineId: null,
                 url,
@@ -749,7 +749,7 @@ router
                 content,
                 color_RGB: JSON.parse(color_RGB),
                 create_date: (new Date(create_date)),
-                is_main,
+                is_main: JSON.parse(is_main),
                 contain_branch: 0
             });
 
