@@ -192,7 +192,7 @@ router
     // avatar
     router.put('/user/avatar/:userId', async ctx => {
         const userId = ctx.params.userId;
-        const file = ctx.request.files.file
+        const file = ctx.request.files.file;
         const basename = path.basename(file.path)
         
         console.log(userId)
@@ -211,12 +211,14 @@ router
             if (userObj) {
                 if(userObj.avatar_url){
                     var re = /http:\/\/140.114.91.242:3000\/(upload_.*)/i;
-                    var file_name = userObj.avatar_url.match(re)[1];
-                    console.log(file_name);
-                    await fs.unlink('avatar/' + file_name, function(err) {
-                        if (err) throw err;
-                        console.log('file deleted');
-                    });
+                    if(userObj.avatar_url.match(re)){
+                        var file_name = userObj.avatar_url.match(re)[1];
+                        console.log(file_name);
+                        await fs.unlink('avatar/' + file_name, function(err) {
+                            if (err) throw err;
+                            console.log('file deleted');
+                        });
+                    }
                 }
                 await ctx.db.collection('User').updateOne({_id: mongo.ObjectId(userId)}, {$set: {
                     name: userObj.name,
