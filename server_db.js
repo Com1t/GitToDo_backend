@@ -172,7 +172,7 @@ router
                     account: account ? account: userObj.account,
                     password: password ? password: userObj.password,
                     avatar_url: avatar_url ?  JSON.parse(avatar_url): userObj.avatar_url,
-                    todo_host: mongo.ObjectId(userObj.insertedId),
+                    todo_host: mongo.ObjectId(userObj.todo_host),
                 }});
                 await ctx.db.collection('User').findOne({_id: mongo.ObjectId(id)})
                 .then((res) => {
