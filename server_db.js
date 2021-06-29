@@ -12,10 +12,10 @@ const app = new Koa();
 const router = new Router();
 
 app.use(mongo({
-    host: '140.114.91.242',
-    user: 'mongo',
-    pass: 'sct2head',
-    port: 38017,
+    host: 'YOUR IP',
+    user: 'username',
+    pass: 'password',
+    port: 27017,
     db: 'git_to_do',
 }));
 
