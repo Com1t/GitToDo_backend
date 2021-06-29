@@ -1,4 +1,6 @@
 # Koa-API
+This is the backend of our GitToDo project
+[Link to frontend](https://github.com/Ice1187/GitoDo) 
 
 ## Get Started
 Address, port needs to be modified
